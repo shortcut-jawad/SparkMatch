@@ -263,11 +263,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// In Vercel serverless, @vercel/node handles the port binding — we just export the server.
-// Locally (node server.js), we listen normally.
-if (process.env.VERCEL !== '1') {
-  const PORT = process.env.PORT || 3000;
-  server.listen(PORT, () => console.log(`SparkMatch running at http://localhost:${PORT}`));
-}
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`SparkMatch running at http://localhost:${PORT}`));
 
 module.exports = server;
