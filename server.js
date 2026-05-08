@@ -10,17 +10,29 @@ const multer = require('multer');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['websocket', 'polling'],
+});
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── MongoDB ──
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sparkmatch')
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB error:', err));
+// ── MongoDB connection caching (serverless-safe) ──
+let _mongoCache = null;
 
+async function connectDB() {
+  if (_mongoCache && mongoose.connection.readyState === 1) return _mongoCache;
+  if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI not set');
+  _mongoCache = await mongoose.connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+    maxPoolSize: 10,
+  });
+  return _mongoCache;
+}
+
+// ── Schema ──
 const userSchema = new mongoose.Schema({
   username:    { type: String, required: true, unique: true, trim: true, lowercase: true },
   password:    { type: String, required: true },
@@ -29,13 +41,13 @@ const userSchema = new mongoose.Schema({
   bio:         { type: String, default: '', maxlength: 150 },
 }, { timestamps: true });
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'sparkmatch_jwt_secret_2024';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 3 * 1024 * 1024 },
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Images only'));
   }
@@ -48,10 +60,17 @@ function auth(req, res, next) {
   catch { res.status(401).json({ error: 'Invalid token' }); }
 }
 
-// ── Auth Routes ──
+function publicUser(u) {
+  return { id: u._id, username: u.username, displayName: u.displayName, bio: u.bio, picture: u.picture };
+}
+
+// ── Routes ──
+
+app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 app.post('/api/register', upload.single('picture'), async (req, res) => {
   try {
+    await connectDB();
     const { username, password, displayName, bio } = req.body;
     if (!username || !password || !displayName)
       return res.status(400).json({ error: 'Username, password, and display name are required' });
@@ -76,37 +95,45 @@ app.post('/api/register', upload.single('picture'), async (req, res) => {
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: publicUser(user) });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Register error:', e.message);
+    if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
+    res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });
 
 app.post('/api/login', async (req, res) => {
   try {
+    await connectDB();
     const { username, password } = req.body;
-    const user = await User.findOne({ username: username?.toLowerCase() });
+    if (!username || !password)
+      return res.status(400).json({ error: 'Username and password are required' });
+    const user = await User.findOne({ username: username.toLowerCase() });
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(400).json({ error: 'Invalid username or password' });
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: publicUser(user) });
   } catch (e) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Login error:', e.message);
+    res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });
 
 app.get('/api/profile', auth, async (req, res) => {
   try {
+    await connectDB();
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ error: 'Not found' });
     res.json(publicUser(user));
   } catch (e) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Profile error:', e.message);
+    res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });
 
 app.put('/api/profile', auth, upload.single('picture'), async (req, res) => {
   try {
+    await connectDB();
     const { displayName, bio, currentPassword, newPassword, removePicture } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
@@ -130,22 +157,21 @@ app.put('/api/profile', auth, upload.single('picture'), async (req, res) => {
     await user.save();
     res.json(publicUser(user));
   } catch (e) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Update error:', e.message);
+    res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });
 
 app.delete('/api/profile', auth, async (req, res) => {
   try {
+    await connectDB();
     await User.findByIdAndDelete(req.user.id);
     res.json({ message: 'Account deleted' });
   } catch (e) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Delete error:', e.message);
+    res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });
-
-function publicUser(u) {
-  return { id: u._id, username: u.username, displayName: u.displayName, bio: u.bio, picture: u.picture };
-}
 
 // ── Socket / Matchmaking ──
 let waitingUsers = [];
@@ -237,5 +263,11 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`SparkMatch running at http://localhost:${PORT}`));
+// In Vercel serverless, @vercel/node handles the port binding — we just export the server.
+// Locally (node server.js), we listen normally.
+if (process.env.VERCEL !== '1') {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => console.log(`SparkMatch running at http://localhost:${PORT}`));
+}
+
+module.exports = server;
