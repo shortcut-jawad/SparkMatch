@@ -521,8 +521,12 @@
 
     /* Sidebar */
     .sidebar {
-      width: 320px; background: var(--surface); border-left: 1px solid var(--border);
+      width: 0; background: var(--surface); border-left: none;
       display: flex; flex-direction: column; z-index: 20; flex-shrink: 0;
+      overflow: hidden; transition: width 0.3s ease, border-left 0.3s ease;
+    }
+    .sidebar.open {
+      width: 320px; border-left: 1px solid var(--border);
     }
     .sidebar-header {
       padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border);
@@ -571,10 +575,20 @@
     }
     .chat-send-btn:hover { filter: brightness(1.1); }
 
+    .ctrl-btn.chat-active { background: rgba(14,165,233,0.25); color: #38bdf8; border: 1px solid rgba(14,165,233,0.4); }
+    .sidebar-close-btn {
+      background: none; border: none; color: var(--text-3); font-size: 1.3rem;
+      cursor: pointer; line-height: 1; padding: 0.2rem 0.4rem; border-radius: 8px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .sidebar-close-btn:hover { color: var(--text); background: var(--surface-2); }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 640px) {
       #call-screen { flex-direction: column; }
-      .sidebar { width: 100%; height: 240px; border-left: none; border-top: 1px solid var(--border); }
+      .sidebar { width: 100%; height: 0; border-left: none; border-top: none;
+        transition: height 0.3s ease, border-top 0.3s ease; }
+      .sidebar.open { width: 100%; height: 240px; border-top: 1px solid var(--border); }
     }
   </style>
 </head>
@@ -781,15 +795,18 @@
         <button class="ctrl-btn end" id="btn-end" title="End call">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         </button>
+        <button class="ctrl-btn" id="btn-chat" title="Chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
       </div>
     </div>
 
   </div>
 
-  <div class="sidebar">
+  <div class="sidebar" id="chat-sidebar">
     <div class="sidebar-header">
       <span class="sidebar-title" id="chat-title">Chat</span>
-      <div class="online-badge"><div class="online-dot"></div> Connected</div>
+      <button class="sidebar-close-btn" id="btn-close-chat" title="Close chat">&#x2715;</button>
     </div>
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-input-area">
@@ -1302,6 +1319,21 @@ document.getElementById('btn-vid').addEventListener('click', () => {
     ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 11.35V8l6-4v16l-2.47-1.65"/><path d="M11 5l1-1h2"/><path d="m3 3 18 18"/><path d="M3 7H2v13h14"/></svg>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>`;
 });
+
+// Chat toggle
+const chatSidebar = document.getElementById('chat-sidebar');
+const btnChat = document.getElementById('btn-chat');
+const btnCloseChat = document.getElementById('btn-close-chat');
+
+function toggleChat(forceOpen) {
+  const open = forceOpen !== undefined ? forceOpen : !chatSidebar.classList.contains('open');
+  chatSidebar.classList.toggle('open', open);
+  btnChat.classList.toggle('chat-active', open);
+  if (open) document.getElementById('chat-input').focus();
+}
+
+btnChat.addEventListener('click', () => toggleChat());
+btnCloseChat.addEventListener('click', () => toggleChat(false));
 
 // Chat
 const chatMessages = document.getElementById('chat-messages');
