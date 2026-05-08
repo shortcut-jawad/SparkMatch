@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, required: true, trim: true, maxlength: 30 },
   picture:     { type: String, default: null },
   bio:         { type: String, default: '', maxlength: 150 },
+  city:        { type: String, default: '', maxlength: 100, trim: true },
 }, { timestamps: true });
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
@@ -61,7 +62,7 @@ function auth(req, res, next) {
 }
 
 function publicUser(u) {
-  return { id: u._id, username: u.username, displayName: u.displayName, bio: u.bio, picture: u.picture };
+  return { id: u._id, username: u.username, displayName: u.displayName, bio: u.bio, picture: u.picture, city: u.city || '' };
 }
 
 // ── Routes ──
@@ -71,7 +72,7 @@ app.get('/api/health', (_, res) => res.json({ ok: true }));
 app.post('/api/register', upload.single('picture'), async (req, res) => {
   try {
     await connectDB();
-    const { username, password, displayName, bio } = req.body;
+    const { username, password, displayName, bio, city } = req.body;
     if (!username || !password || !displayName)
       return res.status(400).json({ error: 'Username, password, and display name are required' });
     if (password.length < 6)
@@ -89,6 +90,7 @@ app.post('/api/register', upload.single('picture'), async (req, res) => {
       password: await bcrypt.hash(password, 10),
       displayName,
       bio: bio || '',
+      city: city || '',
       picture,
     });
 
@@ -134,12 +136,13 @@ app.get('/api/profile', auth, async (req, res) => {
 app.put('/api/profile', auth, upload.single('picture'), async (req, res) => {
   try {
     await connectDB();
-    const { displayName, bio, currentPassword, newPassword, removePicture } = req.body;
+    const { displayName, bio, city, currentPassword, newPassword, removePicture } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
 
     if (displayName) user.displayName = displayName;
     if (bio !== undefined) user.bio = bio;
+    if (city !== undefined) user.city = city;
 
     if (removePicture === 'true') {
       user.picture = null;
@@ -178,18 +181,42 @@ let waitingUsers = [];
 let matches = {};
 let socketProfiles = {};
 
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function tryMatch() {
   if (waitingUsers.length < 2) return;
-  const pool = [...waitingUsers];
-  const i1 = Math.floor(Math.random() * pool.length);
-  let i2;
-  do { i2 = Math.floor(Math.random() * pool.length); } while (i2 === i1);
-  const u1 = pool[i1], u2 = pool[i2];
+
+  let u1, u2;
+  const withLoc = waitingUsers.filter(u => u.lat != null && u.lng != null);
+
+  if (withLoc.length >= 2) {
+    let minDist = Infinity;
+    for (let i = 0; i < withLoc.length; i++) {
+      for (let j = i + 1; j < withLoc.length; j++) {
+        const d = haversineKm(withLoc[i].lat, withLoc[i].lng, withLoc[j].lat, withLoc[j].lng);
+        if (d < minDist) { minDist = d; u1 = withLoc[i]; u2 = withLoc[j]; }
+      }
+    }
+  } else {
+    const pool = [...waitingUsers];
+    const i1 = Math.floor(Math.random() * pool.length);
+    let i2;
+    do { i2 = Math.floor(Math.random() * pool.length); } while (i2 === i1);
+    u1 = pool[i1]; u2 = pool[i2];
+  }
+
   waitingUsers = waitingUsers.filter(u => u.id !== u1.id && u.id !== u2.id);
   matches[u1.id] = { partnerId: u2.id, accepted: false };
   matches[u2.id] = { partnerId: u1.id, accepted: false };
-  io.to(u1.id).emit('show_profile', { partnerId: u2.id, displayName: u2.displayName, picture: u2.picture, bio: u2.bio });
-  io.to(u2.id).emit('show_profile', { partnerId: u1.id, displayName: u1.displayName, picture: u1.picture, bio: u1.bio });
+  io.to(u1.id).emit('show_profile', { partnerId: u2.id, displayName: u2.displayName, picture: u2.picture, bio: u2.bio, city: u2.city || '' });
+  io.to(u2.id).emit('show_profile', { partnerId: u1.id, displayName: u1.displayName, picture: u1.picture, bio: u1.bio, city: u1.city || '' });
 }
 
 function broadcastCount() {
