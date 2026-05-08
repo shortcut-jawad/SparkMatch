@@ -794,9 +794,8 @@
         <div class="reveal-badge">New Match ✨</div>
       </div>
       <div class="reveal-body">
-        <div class="reveal-name" id="reveal-name">—</div>
+        <div class="reveal-name" id="reveal-name">—<span id="reveal-city-inline" style="display:none;font-weight:400;color:var(--text-3)"></span></div>
         <div class="reveal-bio" id="reveal-bio"></div>
-        <div class="reveal-city" id="reveal-city" style="display:none">📍 <span id="reveal-city-text"></span></div>
         <div class="reveal-status" id="reveal-status"></div>
         <div class="reveal-actions" id="reveal-actions">
           <button class="btn-skip" id="btn-skip">
@@ -1259,12 +1258,12 @@ socket.on('show_profile', ({ partnerId: pid, displayName, picture, bio, city }) 
 
   document.getElementById('reveal-name').textContent = displayName;
   document.getElementById('reveal-bio').textContent = bio || '';
-  const revCityEl = document.getElementById('reveal-city');
+  const cityInline = document.getElementById('reveal-city-inline');
   if (city) {
-    document.getElementById('reveal-city-text').textContent = city;
-    revCityEl.style.display = 'flex';
+    cityInline.textContent = ', ' + city;
+    cityInline.style.display = 'inline';
   } else {
-    revCityEl.style.display = 'none';
+    cityInline.style.display = 'none';
   }
   document.getElementById('reveal-status').textContent = '';
 
