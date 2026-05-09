@@ -80,7 +80,10 @@ function startMatching() {
       { timeout: 5000 }
     );
   } else if (!locStatus) {
-    showLocBanner(null);
+    // First-time user: show location banner and join waiting AFTER they respond,
+    // so they're not placed in the queue while interacting with a browser permission dialog
+    showLocBanner(doJoinWaiting);
+    return;
   }
   doJoinWaiting();
 }

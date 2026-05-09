@@ -1,6 +1,12 @@
 /* auth.css: styles for the login (index.html) and signup (signup.html) pages */
 
-.auth-wrap { width: 100%; max-width: 420px; }
+/* Allow the auth screen to scroll when content (e.g. signup form) is taller than viewport */
+#auth-screen {
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+
+.auth-wrap { width: 100%; max-width: 420px; margin-top: auto; margin-bottom: auto; }
 .auth-header { text-align: center; margin-bottom: 2rem; }
 .auth-header .tagline { margin-top: 0.4rem; }
 .auth-card { padding: 2rem; }

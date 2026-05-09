@@ -260,11 +260,21 @@ io.on('connection', (socket) => {
     const partner = { id: m.partnerId, ...socketProfiles[m.partnerId] };
     delete matches[socket.id];
     delete matches[m.partnerId];
-    waitingUsers.push(me, partner);
     io.to(socket.id).emit('back_to_waiting');
     io.to(partner.id).emit('back_to_waiting');
+    // Put partner back immediately; stagger self re-entry so the same pair
+    // isn't instantly re-matched with each other when they're the only two online
+    waitingUsers = waitingUsers.filter(u => u.id !== partner.id);
+    waitingUsers.push(partner);
     broadcastCount();
-    tryMatch();
+    setTimeout(() => {
+      if (socketProfiles[socket.id] && !matches[socket.id]) {
+        waitingUsers = waitingUsers.filter(u => u.id !== socket.id);
+        waitingUsers.push(me);
+        broadcastCount();
+        tryMatch();
+      }
+    }, 2000);
   });
 
   socket.on('webrtc_offer',   ({ offer, to })      => io.to(to).emit('webrtc_offer',   { offer, from: socket.id }));
