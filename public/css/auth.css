@@ -1,0 +1,17 @@
+/* auth.css: styles for the login (index.html) and signup (signup.html) pages */
+
+.auth-wrap { width: 100%; max-width: 420px; }
+.auth-header { text-align: center; margin-bottom: 2rem; }
+.auth-header .tagline { margin-top: 0.4rem; }
+.auth-card { padding: 2rem; }
+.auth-form { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
+.auth-footer { text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: var(--text-3); }
+.auth-footer a { color: var(--primary-2); cursor: pointer; text-decoration: none; font-weight: 600; }
+.auth-footer a:hover { text-decoration: underline; }
+
+/* Picture preview in signup form */
+.pic-preview-wrap { display: flex; align-items: center; gap: 1rem; }
+.pic-preview-thumb {
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--primary-2); display: none;
+}

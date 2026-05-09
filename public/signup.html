@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SparkMatch — Create Account</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/auth.css" />
+</head>
+<body>
+
+<div class="ambient">
+  <div class="ambient-1"></div>
+  <div class="ambient-2"></div>
+  <div class="ambient-3"></div>
+</div>
+
+<div class="screen active" id="auth-screen">
+  <div class="auth-wrap">
+    <div class="auth-header">
+      <div class="logo-text">SparkMatch</div>
+      <div class="subtitle tagline">Meet someone new, right now</div>
+    </div>
+
+    <div class="card auth-card">
+      <form class="auth-form" id="register-form">
+        <div class="input-group">
+          <label class="input-label">Display Name</label>
+          <input class="input-field" id="reg-displayname" placeholder="How should we call you?" maxlength="30" required />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Username</label>
+          <input class="input-field" id="reg-username" placeholder="unique_username" maxlength="20" autocomplete="username" required />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Password</label>
+          <input class="input-field" id="reg-password" type="password" placeholder="Min. 6 characters" autocomplete="new-password" required />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Bio <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+          <input class="input-field" id="reg-bio" placeholder="Tell people a bit about yourself..." maxlength="150" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">City <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+          <input class="input-field" id="reg-city" placeholder="e.g. Lahore, Karachi..." maxlength="100" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Profile Picture <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+          <div class="pic-preview-wrap">
+            <img class="pic-preview-thumb" id="reg-pic-thumb" alt="preview" />
+            <div class="file-upload-area" style="flex:1;padding:1rem">
+              <input type="file" id="reg-picture" accept="image/*" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span style="font-size:0.82rem;color:var(--text-3)">Upload photo</span>
+            </div>
+          </div>
+        </div>
+        <div id="reg-error" style="color:#f87171;font-size:0.85rem;min-height:1rem"></div>
+        <button type="submit" class="btn btn-primary btn-full btn-lg" id="reg-btn">Create Account</button>
+      </form>
+    </div>
+
+    <div class="auth-footer">
+      Already have an account? <a href="index.html">Sign in</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module" src="js/auth.js"></script>
+</body>
+</html>
