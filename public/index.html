@@ -970,7 +970,9 @@ const SCREENS = {
   call: document.getElementById('call-screen'),
 };
 
+let currentScreen = 'auth';
 function showScreen(name) {
+  currentScreen = name;
   Object.values(SCREENS).forEach(s => s.classList.remove('active'));
   SCREENS[name].classList.add('active');
 }
@@ -1171,6 +1173,7 @@ function startMatching() {
 }
 
 function cancelWaiting() {
+  socket.emit('leave_waiting');
   showScreen('home');
 }
 
@@ -1435,6 +1438,13 @@ document.getElementById('btn-vid').addEventListener('click', () => {
   btn.innerHTML = isCamOff
     ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 11.35V8l6-4v16l-2.47-1.65"/><path d="M11 5l1-1h2"/><path d="m3 3 18 18"/><path d="M3 7H2v13h14"/></svg>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>`;
+});
+
+// Auto-rejoin waiting pool after socket reconnect (e.g. server restart)
+socket.on('connect', () => {
+  if (currentScreen === 'waiting' && currentUser) {
+    doJoinWaiting();
+  }
 });
 
 // ── LOCATION ──

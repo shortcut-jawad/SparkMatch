@@ -224,11 +224,19 @@ function broadcastCount() {
 }
 
 io.on('connection', (socket) => {
+  socket.emit('waiting_count', { count: waitingUsers.length });
+
   socket.on('join_waiting', (profile) => {
+    waitingUsers = waitingUsers.filter(u => u.id !== socket.id); // dedup
     socketProfiles[socket.id] = profile;
     waitingUsers.push({ id: socket.id, ...profile });
     broadcastCount();
     tryMatch();
+  });
+
+  socket.on('leave_waiting', () => {
+    waitingUsers = waitingUsers.filter(u => u.id !== socket.id);
+    broadcastCount();
   });
 
   socket.on('accept', () => {
