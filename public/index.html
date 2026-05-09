@@ -1158,16 +1158,16 @@ function doJoinWaiting() {
 function startMatching() {
   if (!currentUser) return;
   const locStatus = localStorage.getItem('sm_loc_status');
-  if (locationCoords) { doJoinWaiting(); return; }
-  if (locStatus === 'granted') {
+  if (locStatus === 'granted' && !locationCoords) {
     navigator.geolocation?.getCurrentPosition(
-      p => { locationCoords = { lat: p.coords.latitude, lng: p.coords.longitude }; doJoinWaiting(); },
-      () => doJoinWaiting(),
+      p => { locationCoords = { lat: p.coords.latitude, lng: p.coords.longitude }; },
+      () => {},
       { timeout: 5000 }
-    ) ?? doJoinWaiting();
-  } else {
-    showLocBanner(doJoinWaiting);
+    );
+  } else if (!locStatus) {
+    showLocBanner(null);
   }
+  doJoinWaiting();
 }
 
 function cancelWaiting() {
