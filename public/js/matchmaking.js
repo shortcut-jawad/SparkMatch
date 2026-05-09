@@ -14,7 +14,7 @@ export function initMatchmaking({ showScreen, toast, doJoinWaiting }) {
     state.partnerId = pid;
     state.partnerProfile = { displayName, picture, bio, city };
 
-    document.getElementById('reveal-name').textContent = displayName;
+    document.getElementById('reveal-name-text').textContent = displayName;
     document.getElementById('reveal-bio').textContent  = bio || '';
 
     const cityInline = document.getElementById('reveal-city-inline');
