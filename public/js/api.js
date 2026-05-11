@@ -55,3 +55,19 @@ export async function apiDeleteProfile(token) {
   });
   if (!res.ok) throw new Error('Delete failed');
 }
+
+export async function apiGetMatches(token) {
+  const res = await fetch('/api/matches', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  if (!res.ok) throw new Error('Failed to load matches');
+  return res.json();
+}
+
+export async function apiGetMatchMessages(token, matchId) {
+  const res = await fetch(`/api/matches/${matchId}/messages`, {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  if (!res.ok) throw new Error('Failed to load messages');
+  return res.json();
+}

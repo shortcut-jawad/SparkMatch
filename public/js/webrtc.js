@@ -8,7 +8,22 @@ const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'st
 export function initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg }) {
 
   socket.on('start_call', async ({ initiator, partnerId: pid }) => {
-    state.partnerId = pid;
+    state.partnerId    = pid;
+    state.hasLiked     = false;
+    state.partnerLiked = false;
+    state.currentMatchId = null;
+
+    // Reset like button
+    const likeBtn = document.getElementById('btn-like');
+    likeBtn.classList.remove('liked');
+    document.getElementById('like-icon-outline').style.display = '';
+    document.getElementById('like-icon-filled').style.display  = 'none';
+
+    // Clear notification & banner
+    const notif = document.getElementById('call-like-notification');
+    notif.classList.remove('show');
+    notif.textContent = '';
+    document.getElementById('mutual-match-banner').classList.remove('show');
 
     document.getElementById('call-partner-name').textContent  = state.partnerProfile.displayName || '—';
     document.getElementById('chat-title').textContent         = `Chat with ${state.partnerProfile.displayName}`;
@@ -70,6 +85,36 @@ export function initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg }) {
     else showScreen('home');
   });
 
+  // ── Like Button ──
+  document.getElementById('btn-like').addEventListener('click', () => {
+    if (state.hasLiked || !state.partnerId) return;
+    state.hasLiked = true;
+    socket.emit('like_user');
+
+    const likeBtn = document.getElementById('btn-like');
+    likeBtn.classList.add('liked');
+    document.getElementById('like-icon-outline').style.display = 'none';
+    document.getElementById('like-icon-filled').style.display  = '';
+  });
+
+  socket.on('partner_liked_you', ({ displayName }) => {
+    state.partnerLiked = true;
+    const notif = document.getElementById('call-like-notification');
+    notif.innerHTML = `<strong>${displayName}</strong> liked you! Tap the like button to connect.`;
+    notif.classList.add('show');
+    setTimeout(() => notif.classList.remove('show'), 6000);
+  });
+
+  socket.on('mutual_like', ({ matchId, partnerDisplayName }) => {
+    state.currentMatchId = matchId;
+    const banner = document.getElementById('mutual-match-banner');
+    document.getElementById('mutual-match-text').textContent =
+      `You and ${partnerDisplayName} liked each other. Your chat has been saved permanently!`;
+    banner.classList.add('show');
+    // Auto-hide after 8 seconds
+    setTimeout(() => banner.classList.remove('show'), 8000);
+  });
+
   // ── Controls ──
   document.getElementById('btn-end').addEventListener('click', () => {
     endCall(true);
@@ -124,5 +169,21 @@ export function endCall(notify = true) {
   if (state.localStream) { state.localStream.getTracks().forEach(t => t.stop()); state.localStream = null; }
   document.getElementById('remote-video').srcObject = null;
   document.getElementById('local-video').srcObject  = null;
-  state.partnerId = null;
+  state.partnerId    = null;
+  state.hasLiked     = false;
+  state.partnerLiked = false;
+
+  // Reset like UI
+  const likeBtn = document.getElementById('btn-like');
+  if (likeBtn) {
+    likeBtn.classList.remove('liked');
+    const outline = document.getElementById('like-icon-outline');
+    const filled  = document.getElementById('like-icon-filled');
+    if (outline) outline.style.display = '';
+    if (filled)  filled.style.display  = 'none';
+  }
+  const notif = document.getElementById('call-like-notification');
+  if (notif) { notif.classList.remove('show'); }
+  const banner = document.getElementById('mutual-match-banner');
+  if (banner) { banner.classList.remove('show'); }
 }

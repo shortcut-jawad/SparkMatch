@@ -44,6 +44,21 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
+const matchSchema = new mongoose.Schema({
+  users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+}, { timestamps: true });
+
+const Match = mongoose.models.Match || mongoose.model('Match', matchSchema);
+
+const permanentMsgSchema = new mongoose.Schema({
+  matchId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Match', required: true },
+  senderId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  senderName: { type: String, required: true },
+  text:       { type: String, required: true, maxlength: 1000 },
+}, { timestamps: true });
+
+const PermanentMessage = mongoose.models.PermanentMessage || mongoose.model('PermanentMessage', permanentMsgSchema);
+
 const JWT_SECRET = process.env.JWT_SECRET || 'sparkmatch_jwt_secret_2024';
 
 const upload = multer({
@@ -176,10 +191,55 @@ app.delete('/api/profile', auth, async (req, res) => {
   }
 });
 
+// ── Match API Routes ──
+app.get('/api/matches', auth, async (req, res) => {
+  try {
+    await connectDB();
+    const userMatches = await Match.find({ users: req.user.id })
+      .populate('users', 'displayName picture username bio city')
+      .sort({ createdAt: -1 });
+    const results = await Promise.all(userMatches.map(async (m) => {
+      const lastMsg = await PermanentMessage.findOne({ matchId: m._id }).sort({ createdAt: -1 });
+      const partner = m.users.find(u => u._id.toString() !== req.user.id);
+      return {
+        id: m._id,
+        partner: partner ? publicUser(partner) : null,
+        lastMessage: lastMsg
+          ? { text: lastMsg.text, senderName: lastMsg.senderName, createdAt: lastMsg.createdAt }
+          : null,
+        createdAt: m.createdAt,
+      };
+    }));
+    res.json(results);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/matches/:matchId/messages', auth, async (req, res) => {
+  try {
+    await connectDB();
+    const match = await Match.findOne({ _id: req.params.matchId, users: req.user.id });
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+    const messages = await PermanentMessage.find({ matchId: req.params.matchId })
+      .sort({ createdAt: 1 }).limit(200);
+    res.json(messages.map(m => ({
+      id: m._id,
+      senderId: m.senderId.toString(),
+      senderName: m.senderName,
+      text: m.text,
+      createdAt: m.createdAt,
+    })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Socket / Matchmaking ──
 let waitingUsers = [];
 let matches = {};
 let socketProfiles = {};
+let userSockets = {};
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -226,8 +286,18 @@ function broadcastCount() {
 io.on('connection', (socket) => {
   socket.emit('waiting_count', { count: waitingUsers.length });
 
+  socket.on('identify', ({ userId }) => {
+    if (!userId) return;
+    socket.userId = userId;
+    userSockets[userId] = socket.id;
+  });
+
   socket.on('join_waiting', (profile) => {
     waitingUsers = waitingUsers.filter(u => u.id !== socket.id); // dedup
+    if (profile.userId) {
+      socket.userId = profile.userId;
+      userSockets[profile.userId] = socket.id;
+    }
     socketProfiles[socket.id] = profile;
     waitingUsers.push({ id: socket.id, ...profile });
     broadcastCount();
@@ -277,6 +347,74 @@ io.on('connection', (socket) => {
     }, 2000);
   });
 
+  socket.on('like_user', async () => {
+    const m = matches[socket.id];
+    if (!m) return;
+    if (!m.likes) m.likes = {};
+    if (m.likes[socket.id]) return;
+    m.likes[socket.id] = true;
+
+    const myName = socketProfiles[socket.id]?.displayName || 'Someone';
+    io.to(m.partnerId).emit('partner_liked_you', { displayName: myName });
+
+    const pm = matches[m.partnerId];
+    if (pm?.likes?.[m.partnerId]) {
+      const myUserId = socketProfiles[socket.id]?.userId;
+      const partnerUserId = socketProfiles[m.partnerId]?.userId;
+      if (myUserId && partnerUserId) {
+        try {
+          await connectDB();
+          let existingMatch = await Match.findOne({ users: { $all: [myUserId, partnerUserId] } });
+          if (!existingMatch) existingMatch = await Match.create({ users: [myUserId, partnerUserId] });
+          const mid = existingMatch._id.toString();
+          io.to(socket.id).emit('mutual_like', {
+            matchId: mid,
+            partnerDisplayName: socketProfiles[m.partnerId]?.displayName,
+            partnerPicture:     socketProfiles[m.partnerId]?.picture,
+            partnerId:          partnerUserId,
+          });
+          io.to(m.partnerId).emit('mutual_like', {
+            matchId: mid,
+            partnerDisplayName: socketProfiles[socket.id]?.displayName,
+            partnerPicture:     socketProfiles[socket.id]?.picture,
+            partnerId:          myUserId,
+          });
+        } catch (e) {
+          console.error('Match creation error:', e);
+        }
+      }
+    }
+  });
+
+  socket.on('join_match_room', ({ matchId }) => {
+    if (matchId) socket.join(`match_${matchId}`);
+  });
+
+  socket.on('permanent_message', async ({ matchId, text }) => {
+    if (!text?.trim() || !matchId || !socket.userId) return;
+    try {
+      await connectDB();
+      const match = await Match.findOne({ _id: matchId, users: socket.userId });
+      if (!match) return;
+      const msg = await PermanentMessage.create({
+        matchId,
+        senderId:   socket.userId,
+        senderName: socketProfiles[socket.id]?.displayName || 'Unknown',
+        text:       text.trim().slice(0, 1000),
+      });
+      io.to(`match_${matchId}`).emit('permanent_message', {
+        id:         msg._id,
+        matchId,
+        senderId:   socket.userId,
+        senderName: msg.senderName,
+        text:       msg.text,
+        createdAt:  msg.createdAt,
+      });
+    } catch (e) {
+      console.error('Permanent message error:', e);
+    }
+  });
+
   socket.on('webrtc_offer',   ({ offer, to })      => io.to(to).emit('webrtc_offer',   { offer, from: socket.id }));
   socket.on('webrtc_answer',  ({ answer, to })     => io.to(to).emit('webrtc_answer',  { answer, from: socket.id }));
   socket.on('webrtc_ice',     ({ candidate, to })  => io.to(to).emit('webrtc_ice',     { candidate, from: socket.id }));
@@ -297,6 +435,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     waitingUsers = waitingUsers.filter(u => u.id !== socket.id);
+    if (socket.userId) delete userSockets[socket.userId];
     const m = matches[socket.id];
     if (m) {
       io.to(m.partnerId).emit('call_ended');

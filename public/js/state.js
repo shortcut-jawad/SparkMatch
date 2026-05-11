@@ -11,4 +11,9 @@ export const state = {
   locationCoords: null,
   locBannerCallback: null,
   currentScreen: 'home',
+  hasLiked: false,
+  partnerLiked: false,
+  currentMatchId: null,
+  openMatchId: null,
+  activeMatches: [],
 };
