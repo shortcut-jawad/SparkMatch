@@ -26,14 +26,14 @@
       <div class="topbar-actions">
         <button class="topbar-icon-btn" id="btn-open-chats" title="Messages" onclick="showChatsScreen()">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <!-- Back bubble (lower-left, drawn first so it sits behind) -->
-            <path d="M2 9C2 7.9 2.9 7 4 7H13C14.1 7 15 7.9 15 9V16C15 17.1 14.1 18 13 18H9L6 22V18H4C2.9 18 2 17.1 2 16V9Z"/>
-            <!-- Front bubble (upper-right, white fill masks back bubble behind it) -->
-            <path d="M10 2H20C21.1 2 22 2.9 22 4V11C22 12.1 21.1 13 20 13H16L14 16V13H10C8.9 13 8 12.1 8 11V4C8 2.9 8.9 2 10 2Z" fill="white"/>
+            <!-- Back oval bubble (lower-left, behind) — pure ellipse with tail -->
+            <path d="M3 14C3 11.79 5.91 10 9.5 10C13.09 10 16 11.79 16 14C16 16.21 13.09 18 9.5 18L8 18L6 22L7.5 18C5.91 18 3 16.21 3 14Z"/>
+            <!-- Front oval bubble (upper-right, white fill hides back bubble behind it) -->
+            <path d="M7 7.5C7 5.01 10.13 3 14 3C17.87 3 21 5.01 21 7.5C21 9.99 17.87 12 14 12L12.5 12L10.5 16L12 12C10.13 12 7 9.99 7 7.5Z" fill="white"/>
             <!-- Three dots inside front bubble -->
-            <circle cx="12.5" cy="7.5" r="0.9" fill="currentColor" stroke="none"/>
-            <circle cx="15"   cy="7.5" r="0.9" fill="currentColor" stroke="none"/>
-            <circle cx="17.5" cy="7.5" r="0.9" fill="currentColor" stroke="none"/>
+            <circle cx="11.5" cy="7.5" r="0.9" fill="currentColor" stroke="none"/>
+            <circle cx="14"   cy="7.5" r="0.9" fill="currentColor" stroke="none"/>
+            <circle cx="16.5" cy="7.5" r="0.9" fill="currentColor" stroke="none"/>
           </svg>
         </button>
         <button class="btn btn-secondary" style="font-size:0.85rem" onclick="logout()">Sign out</button>
