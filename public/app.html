@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/chat-media.css" />
   <!-- Socket.io must load before ES modules so window.io is available -->
   <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -228,16 +229,41 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
         </button>
         <div id="chats-detail-avatar"></div>
-        <div>
+        <div style="flex:1">
           <div class="chats-detail-name" id="chats-detail-name"></div>
           <div class="chats-detail-sub">Permanent Chat</div>
+        </div>
+        <div class="chats-header-actions">
+          <button class="chats-call-btn" id="btn-chat-voice-call" title="Voice call">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.22 12.9a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </button>
+          <button class="chats-call-btn" id="btn-chat-video-call" title="Video call">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          </button>
         </div>
       </div>
       <div class="chats-detail-messages" id="chats-detail-messages"></div>
       <div class="chats-detail-input">
-        <div class="chat-input-wrap">
-          <input type="text" id="chats-msg-input" placeholder="Type a message..." maxlength="500" />
-          <button class="chat-send-btn" id="chats-msg-send">Send</button>
+        <div class="voice-record-wrap">
+          <!-- Normal text input row -->
+          <div id="chat-text-input-row" style="display:flex;align-items:center;gap:0.5rem;flex:1">
+            <button class="voice-record-btn" id="chat-voice-record-btn" title="Record voice note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+            </button>
+            <div class="chat-input-wrap" style="flex:1">
+              <input type="text" id="chats-msg-input" placeholder="Type a message..." maxlength="500" />
+              <button class="chat-send-btn" id="chats-msg-send">Send</button>
+            </div>
+          </div>
+
+          <!-- Recording state row (hidden until recording) -->
+          <div class="voice-recording-ui" id="chat-voice-recording-ui">
+            <div class="voice-rec-dot"></div>
+            <span class="voice-rec-time" id="chat-voice-rec-time">0:00</span>
+            <span class="voice-rec-label">Recording…</span>
+            <button class="voice-rec-cancel" id="chat-voice-cancel-btn">Cancel</button>
+            <button class="voice-rec-send" id="chat-voice-send-btn">Send</button>
+          </div>
         </div>
       </div>
     </div>
@@ -312,6 +338,92 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- ══ CHAT CALL OVERLAY ══ -->
+<div id="chat-call-overlay">
+
+  <!-- Ringing (outgoing — waiting for partner to accept) -->
+  <div id="chat-call-ringing" style="display:none" class="chat-call-panel">
+    <div class="chat-call-info">
+      <div class="chat-call-avatar-wrap chat-call-partner-pic-wrap"></div>
+      <div class="chat-call-partner-name"></div>
+      <div class="chat-call-subtitle" id="chat-call-ringing-type">Voice Call</div>
+      <div class="call-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div class="chat-call-controls">
+      <div class="call-ctrl-btn">
+        <button class="call-ctrl-circle call-ctrl-end" id="chat-call-cancel-btn" title="Cancel">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.39 14.66c-1.35-.28-2.71-.45-4.08-.5-.67-.03-1.2.45-1.2 1.12v2.16c0 .6-.36 1.14-.9 1.37-2.53 1.08-5.37 1.08-7.9 0-.54-.23-.9-.77-.9-1.37v-2.16c0-.67-.53-1.15-1.2-1.12-1.37.05-2.73.22-4.08.5C.12 14.95 0 15.45 0 16c0 .55.12 1.05.39 1.34C2.43 19.6 6.97 21 12 21s9.57-1.4 11.61-3.66C23.88 17.05 24 16.55 24 16c0-.55-.12-1.05-.61-1.34z"/></svg>
+        </button>
+        <span>Cancel</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incoming call (partner is calling you) -->
+  <div id="chat-call-incoming" style="display:none" class="chat-call-panel">
+    <div class="chat-call-info">
+      <div class="chat-call-avatar-wrap chat-call-partner-pic-wrap"></div>
+      <div class="chat-call-partner-name"></div>
+      <div class="chat-call-subtitle" id="chat-call-incoming-type">Incoming Voice Call</div>
+    </div>
+    <div class="chat-call-controls">
+      <div class="call-ctrl-btn">
+        <button class="call-ctrl-circle call-ctrl-end" id="chat-call-reject-btn" title="Decline">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.39 14.66c-1.35-.28-2.71-.45-4.08-.5-.67-.03-1.2.45-1.2 1.12v2.16c0 .6-.36 1.14-.9 1.37-2.53 1.08-5.37 1.08-7.9 0-.54-.23-.9-.77-.9-1.37v-2.16c0-.67-.53-1.15-1.2-1.12-1.37.05-2.73.22-4.08.5C.12 14.95 0 15.45 0 16c0 .55.12 1.05.39 1.34C2.43 19.6 6.97 21 12 21s9.57-1.4 11.61-3.66C23.88 17.05 24 16.55 24 16c0-.55-.12-1.05-.61-1.34z"/></svg>
+        </button>
+        <span>Decline</span>
+      </div>
+      <div class="call-ctrl-btn">
+        <button class="call-ctrl-circle call-ctrl-accept" id="chat-call-accept-btn" title="Accept">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+        </button>
+        <span>Accept</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active call (connected) -->
+  <div id="chat-call-active" style="display:none">
+    <!-- Video feeds (shown only for video calls) -->
+    <div id="chat-call-video-section" style="display:none">
+      <video id="chat-call-remote-video" autoplay playsinline></video>
+      <video id="chat-call-local-video"  autoplay playsinline muted></video>
+    </div>
+    <!-- Hidden audio element for voice-only calls -->
+    <audio id="chat-call-remote-audio" autoplay></audio>
+
+    <div class="chat-call-panel">
+      <div class="chat-call-info">
+        <div class="chat-call-avatar-wrap chat-call-partner-pic-wrap"></div>
+        <div class="chat-call-partner-name"></div>
+        <div id="chat-call-status-text" class="chat-call-subtitle"></div>
+        <div id="chat-call-timer" style="font-size:1.3rem;font-weight:600;color:rgba(255,255,255,0.9);letter-spacing:0.05em;min-height:1.8em"></div>
+      </div>
+      <div class="chat-call-controls">
+        <div class="call-ctrl-btn">
+          <button class="call-ctrl-circle" id="chat-call-mute-btn" title="Mute">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </button>
+          <span>Mute</span>
+        </div>
+        <div class="call-ctrl-btn">
+          <button class="call-ctrl-circle call-ctrl-end" id="chat-call-end-btn" title="End call">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.39 14.66c-1.35-.28-2.71-.45-4.08-.5-.67-.03-1.2.45-1.2 1.12v2.16c0 .6-.36 1.14-.9 1.37-2.53 1.08-5.37 1.08-7.9 0-.54-.23-.9-.77-.9-1.37v-2.16c0-.67-.53-1.15-1.2-1.12-1.37.05-2.73.22-4.08.5C.12 14.95 0 15.45 0 16c0 .55.12 1.05.39 1.34C2.43 19.6 6.97 21 12 21s9.57-1.4 11.61-3.66C23.88 17.05 24 16.55 24 16c0-.55-.12-1.05-.61-1.34z"/></svg>
+          </button>
+          <span>End</span>
+        </div>
+        <div class="call-ctrl-btn" id="chat-call-cam-wrap" style="display:none">
+          <button class="call-ctrl-circle" id="chat-call-cam-btn" title="Camera">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          </button>
+          <span>Camera</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 <script type="module" src="js/app.js"></script>
 </body>

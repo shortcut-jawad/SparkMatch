@@ -16,4 +16,8 @@ export const state = {
   currentMatchId: null,
   openMatchId: null,
   activeMatches: [],
+  chatCallPc:      null,
+  chatCallStream:  null,
+  chatCallType:    null,
+  chatCallMatchId: null,
 };

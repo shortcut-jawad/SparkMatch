@@ -1,11 +1,13 @@
 // app.js: authenticated app entry point — view router, session init, home/edit/chat screens
 import { state } from './state.js';
 import { socket } from './socket.js';
-import { getToken, saveSession, clearSession, apiGetProfile, apiUpdateProfile, apiDeleteProfile, apiGetMatches, apiGetMatchMessages } from './api.js';
+import { getToken, saveSession, clearSession, apiGetProfile, apiUpdateProfile, apiDeleteProfile, apiGetMatches, apiGetMatchMessages, apiPostVoiceNote } from './api.js';
 import { initials, setLoading, compressPic } from './utils.js';
 import { initLocation, showLocBanner } from './location.js';
 import { initMatchmaking } from './matchmaking.js';
 import { initWebRTC } from './webrtc.js';
+import { VoiceRecorder } from './chat/voiceRecorder.js';
+import { initChatCall, startChatCallInvite } from './chat/chatCall.js';
 
 // ── VIEW ROUTER ──
 const SCREENS = {
@@ -299,11 +301,54 @@ async function openChat(match) {
   }
 }
 
+function fmtDuration(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 function appendPermanentMsg(msg, partner) {
-  const isMe = msg.senderId === state.currentUser?.id;
-  const div = document.createElement('div');
-  div.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-them'}`;
-  div.innerHTML = `<div class="msg-label">${isMe ? 'You' : (partner?.displayName || msg.senderName)}</div>${msg.text}`;
+  const isMe  = msg.senderId === state.currentUser?.id;
+  const label = isMe ? 'You' : (partner?.displayName || msg.senderName);
+  const div   = document.createElement('div');
+
+  if (msg.type === 'voice') {
+    div.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-them'} msg-voice`;
+    div.innerHTML = `
+      <div class="msg-label">${label}</div>
+      <div class="voice-note-player">
+        <button class="voice-play-btn" aria-label="Play voice note">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <div class="voice-note-track"><div class="voice-note-progress"></div></div>
+        <span class="voice-note-dur">${fmtDuration(msg.duration || 0)}</span>
+      </div>`;
+
+    const audio    = new Audio(msg.voiceData);
+    const playBtn  = div.querySelector('.voice-play-btn');
+    const progress = div.querySelector('.voice-note-progress');
+    const durEl    = div.querySelector('.voice-note-dur');
+    const PLAY_IC  = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    const PAUSE_IC = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
+    audio.addEventListener('timeupdate', () => {
+      const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+      progress.style.width = pct + '%';
+      durEl.textContent    = fmtDuration(audio.currentTime);
+    });
+    audio.addEventListener('ended', () => {
+      playBtn.innerHTML    = PLAY_IC;
+      progress.style.width = '0%';
+      durEl.textContent    = fmtDuration(msg.duration || 0);
+    });
+    playBtn.addEventListener('click', () => {
+      if (audio.paused) { audio.play(); playBtn.innerHTML = PAUSE_IC; }
+      else              { audio.pause(); playBtn.innerHTML = PLAY_IC; }
+    });
+  } else {
+    div.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-them'}`;
+    div.innerHTML = `<div class="msg-label">${label}</div>${msg.text}`;
+  }
+
   chatsDetailMsgs.appendChild(div);
   chatsDetailMsgs.scrollTop = chatsDetailMsgs.scrollHeight;
 }
@@ -323,6 +368,78 @@ document.getElementById('btn-chats-back').addEventListener('click', () => {
   chatsDetailView.style.display = 'none';
   chatsListView.style.display   = 'flex';
   loadMatches();
+});
+
+// ── VOICE NOTES ──
+const recorder      = new VoiceRecorder();
+const voiceRecBtn   = document.getElementById('chat-voice-record-btn');
+const voiceRecordUI = document.getElementById('chat-voice-recording-ui');
+const textInputRow  = document.getElementById('chat-text-input-row');
+const voiceRecTime  = document.getElementById('chat-voice-rec-time');
+let   _recTimer     = null;
+let   _recSeconds   = 0;
+
+function showRecordingUI() {
+  textInputRow.style.display  = 'none';
+  voiceRecordUI.classList.add('active');
+  voiceRecBtn.classList.add('recording');
+  _recSeconds = 0;
+  voiceRecTime.textContent = '0:00';
+  _recTimer = setInterval(() => {
+    _recSeconds++;
+    voiceRecTime.textContent = fmtDuration(_recSeconds);
+    if (_recSeconds >= 120) stopAndSendRecording();
+  }, 1000);
+}
+
+function hideRecordingUI() {
+  clearInterval(_recTimer);
+  textInputRow.style.display = 'flex';
+  voiceRecordUI.classList.remove('active');
+  voiceRecBtn.classList.remove('recording');
+}
+
+voiceRecBtn.addEventListener('click', async () => {
+  if (recorder.isActive) return;
+  try {
+    await recorder.start();
+    showRecordingUI();
+  } catch {
+    toast('Could not access microphone');
+  }
+});
+
+document.getElementById('chat-voice-cancel-btn').addEventListener('click', () => {
+  recorder.cancel();
+  hideRecordingUI();
+});
+
+document.getElementById('chat-voice-send-btn').addEventListener('click', stopAndSendRecording);
+
+async function stopAndSendRecording() {
+  const wasActive = recorder.isActive;
+  hideRecordingUI();
+  if (!wasActive) return;
+  try {
+    const { blob, duration } = await recorder.stop();
+    if (!state.openMatchId) return;
+    await apiPostVoiceNote(state.token, state.openMatchId, blob, duration);
+  } catch {
+    toast('Could not send voice note');
+  }
+}
+
+// ── CHAT CALL BUTTONS ──
+document.getElementById('btn-chat-voice-call').addEventListener('click', () => {
+  if (!state.openMatchId) return;
+  const match = state.activeMatches.find(m => m.id === state.openMatchId);
+  startChatCallInvite(state.openMatchId, 'audio', match?.partner?.displayName, match?.partner?.picture);
+});
+
+document.getElementById('btn-chat-video-call').addEventListener('click', () => {
+  if (!state.openMatchId) return;
+  const match = state.activeMatches.find(m => m.id === state.openMatchId);
+  startChatCallInvite(state.openMatchId, 'video', match?.partner?.displayName, match?.partner?.picture);
 });
 
 socket.on('permanent_message', (msg) => {
@@ -372,6 +489,7 @@ window.showScreen      = showScreen;
     // Init sub-systems
     initMatchmaking({ showScreen, toast, doJoinWaiting });
     initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg });
+    initChatCall({ toast });
   } catch {
     clearSession();
     window.location.replace('/');

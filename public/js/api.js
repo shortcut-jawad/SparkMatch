@@ -71,3 +71,17 @@ export async function apiGetMatchMessages(token, matchId) {
   if (!res.ok) throw new Error('Failed to load messages');
   return res.json();
 }
+
+export async function apiPostVoiceNote(token, matchId, blob, duration) {
+  const fd = new FormData();
+  fd.append('audio', blob, 'voice-note.webm');
+  fd.append('duration', String(Math.round(duration)));
+  const res = await fetch(`/api/matches/${matchId}/voice-note`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token },
+    body: fd,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data;
+}

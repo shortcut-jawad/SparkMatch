@@ -1,0 +1,361 @@
+/* chat-media.css — voice notes, call buttons in chat header, call overlay */
+
+/* ── Chat detail header call buttons ── */
+.chats-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.chats-call-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.12s;
+}
+.chats-call-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--primary);
+  transform: scale(1.08);
+}
+.chats-call-btn svg { display: block; }
+
+/* ── Voice note recording bar ── */
+.voice-record-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.voice-record-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.voice-record-btn:hover { background: var(--surface-2); color: var(--primary); border-color: var(--primary); }
+.voice-record-btn.recording {
+  background: #fee2e2;
+  border-color: var(--danger);
+  color: var(--danger);
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
+  50%       { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+
+.voice-recording-ui {
+  display: none;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  padding: 0.4rem 0.75rem;
+  background: #fef2f2;
+  border-radius: 20px;
+  border: 1.5px solid #fca5a5;
+}
+.voice-recording-ui.active { display: flex; }
+
+.voice-rec-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+  animation: rec-blink 1s ease-in-out infinite;
+}
+@keyframes rec-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.voice-rec-time {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5rem;
+}
+
+.voice-rec-label { font-size: 0.78rem; color: var(--text-3); flex: 1; }
+
+.voice-rec-cancel {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  transition: color 0.15s;
+}
+.voice-rec-cancel:hover { color: var(--danger); }
+
+.voice-rec-send {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+  border: none;
+  border-radius: 10px;
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.voice-rec-send:hover { opacity: 0.85; }
+
+/* ── Voice note message bubble ── */
+.msg-voice { min-width: 200px; max-width: 280px; }
+
+.voice-note-player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.voice-play-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.msg-them .voice-play-btn { background: var(--surface-3); color: var(--text); }
+.voice-play-btn:hover { opacity: 0.8; }
+
+.voice-note-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(0,0,0,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.msg-me .voice-note-track { background: rgba(255,255,255,0.3); }
+
+.voice-note-progress {
+  height: 100%;
+  background: rgba(255,255,255,0.85);
+  border-radius: 4px;
+  transition: width 0.25s linear;
+  width: 0%;
+}
+.msg-them .voice-note-progress { background: var(--primary); }
+
+.voice-note-dur {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  min-width: 2.2rem;
+  text-align: right;
+}
+
+/* ── Chat Call Overlay ── */
+#chat-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #0c1a2e 0%, #0e2a45 60%, #0c1a2e 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+#chat-call-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* shared inner panel */
+.chat-call-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 3rem 2rem 2.5rem;
+}
+
+/* partner avatar */
+.chat-call-avatar-wrap {
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid rgba(14,165,233,0.5);
+  box-shadow: 0 0 0 8px rgba(14,165,233,0.12);
+  flex-shrink: 0;
+}
+.chat-call-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.chat-call-avatar-init {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: var(--font-title);
+}
+
+.chat-call-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: center;
+}
+
+.chat-call-partner-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-title);
+  text-align: center;
+}
+
+.chat-call-subtitle {
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.55);
+  text-align: center;
+}
+
+/* animated dots for ringing */
+.call-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 0.25rem;
+}
+.call-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  animation: dot-wave 1.4s ease-in-out infinite;
+}
+.call-dots span:nth-child(2) { animation-delay: 0.2s; }
+.call-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot-wave {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30%            { transform: translateY(-6px); opacity: 1; }
+}
+
+/* call status + timer */
+#chat-call-status-text {
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.55);
+  min-height: 1.2em;
+}
+#chat-call-timer {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  min-height: 1.8em;
+}
+
+/* control buttons row */
+.chat-call-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.call-ctrl-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.call-ctrl-btn span {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+}
+
+.call-ctrl-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s;
+}
+.call-ctrl-circle:hover { background: rgba(255,255,255,0.2); transform: scale(1.06); }
+.call-ctrl-circle.ctrl-active { background: rgba(255,255,255,0.25); }
+
+.call-ctrl-end {
+  background: var(--danger) !important;
+}
+.call-ctrl-end:hover { background: #dc2626 !important; }
+
+.call-ctrl-accept {
+  background: var(--success) !important;
+}
+.call-ctrl-accept:hover { background: #15803d !important; }
+
+/* video section inside active call */
+#chat-call-video-section {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+#chat-call-remote-video {
+  width: 100%; flex: 1;
+  object-fit: cover;
+  background: #000;
+}
+#chat-call-local-video {
+  position: absolute;
+  bottom: 1rem; right: 1rem;
+  width: 110px; height: 160px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.3);
+  background: #111;
+}
+
+/* Active call panel sits on top of video in video mode */
+#chat-call-active {
+  position: relative;
+  width: 100%; height: 100%;
+}
+#chat-call-active .chat-call-panel {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+}
+[data-call-type="video"] #chat-call-active .chat-call-panel {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 40%, transparent 70%, rgba(0,0,0,0.6) 100%);
+}

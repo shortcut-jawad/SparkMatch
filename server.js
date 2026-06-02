@@ -54,7 +54,10 @@ const permanentMsgSchema = new mongoose.Schema({
   matchId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Match', required: true },
   senderId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   senderName: { type: String, required: true },
-  text:       { type: String, required: true, maxlength: 1000 },
+  type:       { type: String, enum: ['text', 'voice'], default: 'text' },
+  text:       { type: String, default: '', maxlength: 1000 },
+  voiceData:  { type: String, default: null },
+  duration:   { type: Number, default: 0 },
 }, { timestamps: true });
 
 const PermanentMessage = mongoose.models.PermanentMessage || mongoose.model('PermanentMessage', permanentMsgSchema);
@@ -66,6 +69,14 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Images only'));
+  }
+});
+
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    file.mimetype.startsWith('audio/') ? cb(null, true) : cb(new Error('Audio files only'));
   }
 });
 
@@ -205,7 +216,7 @@ app.get('/api/matches', auth, async (req, res) => {
         id: m._id,
         partner: partner ? publicUser(partner) : null,
         lastMessage: lastMsg
-          ? { text: lastMsg.text, senderName: lastMsg.senderName, createdAt: lastMsg.createdAt }
+          ? { text: lastMsg.type === 'voice' ? '🎤 Voice note' : lastMsg.text, senderName: lastMsg.senderName, createdAt: lastMsg.createdAt }
           : null,
         createdAt: m.createdAt,
       };
@@ -224,14 +235,58 @@ app.get('/api/matches/:matchId/messages', auth, async (req, res) => {
     const messages = await PermanentMessage.find({ matchId: req.params.matchId })
       .sort({ createdAt: 1 }).limit(200);
     res.json(messages.map(m => ({
-      id: m._id,
-      senderId: m.senderId.toString(),
+      id:        m._id,
+      senderId:  m.senderId.toString(),
       senderName: m.senderName,
-      text: m.text,
+      type:      m.type || 'text',
+      text:      m.text || '',
+      voiceData: m.voiceData || null,
+      duration:  m.duration  || 0,
       createdAt: m.createdAt,
     })));
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Voice Note Upload ──
+app.post('/api/matches/:matchId/voice-note', auth, audioUpload.single('audio'), async (req, res) => {
+  try {
+    await connectDB();
+    const match = await Match.findOne({ _id: req.params.matchId, users: req.user.id });
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (!req.file)  return res.status(400).json({ error: 'Audio file required' });
+
+    const voiceData = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const duration  = parseFloat(req.body.duration) || 0;
+    const user      = await User.findById(req.user.id).select('displayName');
+
+    const msg = await PermanentMessage.create({
+      matchId:   req.params.matchId,
+      senderId:  req.user.id,
+      senderName: user?.displayName || 'Unknown',
+      type:      'voice',
+      text:      '',
+      voiceData,
+      duration,
+    });
+
+    const payload = {
+      id:        msg._id,
+      matchId:   req.params.matchId,
+      senderId:  req.user.id,
+      senderName: msg.senderName,
+      type:      'voice',
+      voiceData,
+      duration,
+      createdAt: msg.createdAt,
+    };
+
+    io.to(`match_${req.params.matchId}`).emit('permanent_message', payload);
+    res.json(payload);
+  } catch (e) {
+    console.error('Voice note error:', e.message);
+    res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });
 
@@ -240,6 +295,7 @@ let waitingUsers = [];
 let matches = {};
 let socketProfiles = {};
 let userSockets = {};
+let chatCalls = {};
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -419,6 +475,70 @@ io.on('connection', (socket) => {
   socket.on('webrtc_answer',  ({ answer, to })     => io.to(to).emit('webrtc_answer',  { answer, from: socket.id }));
   socket.on('webrtc_ice',     ({ candidate, to })  => io.to(to).emit('webrtc_ice',     { candidate, from: socket.id }));
 
+  // ── Chat Call Signaling ──
+  socket.on('chat_call_invite', async ({ matchId, type }) => {
+    if (!socket.userId || !matchId) return;
+    try {
+      await connectDB();
+      const match = await Match.findOne({ _id: matchId, users: socket.userId });
+      if (!match) return;
+      const partnerId      = match.users.find(u => u.toString() !== socket.userId.toString());
+      if (!partnerId) return;
+      const partnerSocket  = userSockets[partnerId.toString()];
+      if (!partnerSocket) { socket.emit('chat_call_unavailable', { matchId }); return; }
+      chatCalls[matchId] = { caller: socket.id, callee: null, type };
+      io.to(partnerSocket).emit('chat_call_incoming', {
+        matchId,
+        type,
+        callerName:    socketProfiles[socket.id]?.displayName || 'Someone',
+        callerPicture: socketProfiles[socket.id]?.picture     || null,
+      });
+    } catch (e) { console.error('Chat call invite error:', e); }
+  });
+
+  socket.on('chat_call_accept', ({ matchId }) => {
+    const call = chatCalls[matchId];
+    if (!call) return;
+    call.callee = socket.id;
+    io.to(call.caller).emit('chat_call_accepted', { matchId });
+  });
+
+  socket.on('chat_call_reject', ({ matchId }) => {
+    const call = chatCalls[matchId];
+    if (!call) return;
+    io.to(call.caller).emit('chat_call_rejected', { matchId });
+    delete chatCalls[matchId];
+  });
+
+  socket.on('chat_call_offer', ({ offer, matchId }) => {
+    const call = chatCalls[matchId];
+    if (!call) return;
+    const target = socket.id === call.caller ? call.callee : call.caller;
+    if (target) io.to(target).emit('chat_call_offer', { offer });
+  });
+
+  socket.on('chat_call_answer', ({ answer, matchId }) => {
+    const call = chatCalls[matchId];
+    if (!call) return;
+    const target = socket.id === call.callee ? call.caller : call.callee;
+    if (target) io.to(target).emit('chat_call_answer', { answer });
+  });
+
+  socket.on('chat_call_ice', ({ candidate, matchId }) => {
+    const call = chatCalls[matchId];
+    if (!call) return;
+    const target = socket.id === call.caller ? call.callee : call.caller;
+    if (target) io.to(target).emit('chat_call_ice', { candidate });
+  });
+
+  socket.on('chat_call_end', ({ matchId }) => {
+    const call = chatCalls[matchId];
+    if (!call) return;
+    const target = socket.id === call.caller ? call.callee : call.caller;
+    if (target) io.to(target).emit('chat_call_ended', { matchId });
+    delete chatCalls[matchId];
+  });
+
   socket.on('chat_message', ({ message, to }) => {
     const name = socketProfiles[socket.id]?.displayName || 'Unknown';
     io.to(to).emit('chat_message', { message, name });
@@ -444,6 +564,15 @@ io.on('connection', (socket) => {
     delete matches[socket.id];
     delete socketProfiles[socket.id];
     broadcastCount();
+
+    // Clean up any active chat calls involving this socket
+    for (const [matchId, call] of Object.entries(chatCalls)) {
+      if (call.caller === socket.id || call.callee === socket.id) {
+        const target = call.caller === socket.id ? call.callee : call.caller;
+        if (target) io.to(target).emit('chat_call_ended', { matchId });
+        delete chatCalls[matchId];
+      }
+    }
   });
 });
 
