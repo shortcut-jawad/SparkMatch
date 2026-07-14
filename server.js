@@ -54,9 +54,10 @@ const permanentMsgSchema = new mongoose.Schema({
   matchId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Match', required: true },
   senderId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   senderName: { type: String, required: true },
-  type:       { type: String, enum: ['text', 'voice'], default: 'text' },
+  type:       { type: String, enum: ['text', 'voice', 'image'], default: 'text' },
   text:       { type: String, default: '', maxlength: 1000 },
   voiceData:  { type: String, default: null },
+  imageData:  { type: String, default: null },
   duration:   { type: Number, default: 0 },
 }, { timestamps: true });
 
@@ -216,7 +217,7 @@ app.get('/api/matches', auth, async (req, res) => {
         id: m._id,
         partner: partner ? publicUser(partner) : null,
         lastMessage: lastMsg
-          ? { text: lastMsg.type === 'voice' ? '🎤 Voice note' : lastMsg.text, senderName: lastMsg.senderName, createdAt: lastMsg.createdAt }
+          ? { text: lastMsg.type === 'voice' ? '🎤 Voice note' : lastMsg.type === 'image' ? '📷 Photo' : lastMsg.text, senderName: lastMsg.senderName, createdAt: lastMsg.createdAt }
           : null,
         createdAt: m.createdAt,
       };
@@ -241,6 +242,7 @@ app.get('/api/matches/:matchId/messages', auth, async (req, res) => {
       type:      m.type || 'text',
       text:      m.text || '',
       voiceData: m.voiceData || null,
+      imageData: m.imageData || null,
       duration:  m.duration  || 0,
       createdAt: m.createdAt,
     })));
@@ -286,6 +288,44 @@ app.post('/api/matches/:matchId/voice-note', auth, audioUpload.single('audio'), 
     res.json(payload);
   } catch (e) {
     console.error('Voice note error:', e.message);
+    res.status(500).json({ error: 'Server error: ' + e.message });
+  }
+});
+
+// ── Chat Image Upload (reuses the same multer `upload` config used for profile pictures) ──
+app.post('/api/matches/:matchId/image', auth, upload.single('picture'), async (req, res) => {
+  try {
+    await connectDB();
+    const match = await Match.findOne({ _id: req.params.matchId, users: req.user.id });
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (!req.file) return res.status(400).json({ error: 'Image file required' });
+
+    const imageData = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const user = await User.findById(req.user.id).select('displayName');
+
+    const msg = await PermanentMessage.create({
+      matchId:    req.params.matchId,
+      senderId:   req.user.id,
+      senderName: user?.displayName || 'Unknown',
+      type:       'image',
+      text:       '',
+      imageData,
+    });
+
+    const payload = {
+      id:         msg._id,
+      matchId:    req.params.matchId,
+      senderId:   req.user.id,
+      senderName: msg.senderName,
+      type:       'image',
+      imageData,
+      createdAt:  msg.createdAt,
+    };
+
+    io.to(`match_${req.params.matchId}`).emit('permanent_message', payload);
+    res.json(payload);
+  } catch (e) {
+    console.error('Chat image error:', e.message);
     res.status(500).json({ error: 'Server error: ' + e.message });
   }
 });

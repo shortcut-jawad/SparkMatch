@@ -85,3 +85,17 @@ export async function apiPostVoiceNote(token, matchId, blob, duration) {
   if (!res.ok) throw new Error(data.error || 'Upload failed');
   return data;
 }
+
+// Reuses the same multer image upload config as profile picture uploads
+export async function apiPostChatImage(token, matchId, blob) {
+  const fd = new FormData();
+  fd.append('picture', blob, 'chat-photo.jpg');
+  const res = await fetch(`/api/matches/${matchId}/image`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token },
+    body: fd,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data;
+}

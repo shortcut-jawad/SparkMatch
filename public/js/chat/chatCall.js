@@ -113,6 +113,19 @@ export function initChatCall({ toast }) {
     track.enabled = !track.enabled;
     document.getElementById('chat-call-cam-btn').classList.toggle('ctrl-active', !track.enabled);
   });
+
+  // Layout toggle (split ↔ PiP)
+  const chatVideoSec = document.getElementById('chat-call-video-section');
+  const chatBtnLayout = document.getElementById('chat-call-layout-btn');
+  const chatLayoutIcon = document.getElementById('chat-call-layout-icon');
+  const SPLIT_ICON = `<rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/>`;
+  const PIP_ICON   = `<rect x="2" y="2" width="20" height="20" rx="2"/><rect x="13" y="13" width="8" height="6" rx="1" fill="currentColor" stroke="none"/>`;
+
+  chatBtnLayout.addEventListener('click', () => {
+    const pip = chatVideoSec.classList.toggle('pip');
+    chatBtnLayout.classList.toggle('ctrl-active', pip);
+    chatLayoutIcon.innerHTML = pip ? SPLIT_ICON : PIP_ICON;
+  });
 }
 
 export function startChatCallInvite(matchId, type, partnerName, partnerPicture) {
@@ -145,6 +158,17 @@ export function endChatCall(notify = true) {
   state.chatCallMatchId = null;
   state.chatCallType    = null;
   clearInterval(_callTimer);
+
+  // Reset layout state
+  const videoSec = document.getElementById('chat-call-video-section');
+  if (videoSec) videoSec.classList.remove('pip');
+  const chatBtnLayout = document.getElementById('chat-call-layout-btn');
+  if (chatBtnLayout) chatBtnLayout.classList.remove('ctrl-active');
+  const chatLayoutIcon = document.getElementById('chat-call-layout-icon');
+  if (chatLayoutIcon) {
+    chatLayoutIcon.innerHTML = `<rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/>`;
+  }
+
   _hideOverlay();
 }
 
@@ -195,8 +219,10 @@ async function _startPeerConnection(isInitiator) {
   // Show correct UI for call type
   const videoSec = document.getElementById('chat-call-video-section');
   const camWrap  = document.getElementById('chat-call-cam-wrap');
+  const layoutWrap = document.getElementById('chat-call-layout-wrap');
   if (videoSec) videoSec.style.display = type === 'video' ? 'flex' : 'none';
   if (camWrap)  camWrap.style.display  = type === 'video' ? 'flex' : 'none';
+  if (layoutWrap) layoutWrap.style.display = type === 'video' ? 'flex' : 'none';
 
   if (isInitiator) {
     const offer = await state.chatCallPc.createOffer();

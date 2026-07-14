@@ -1,7 +1,7 @@
 // app.js: authenticated app entry point — view router, session init, home/edit/chat screens
 import { state } from './state.js';
 import { socket } from './socket.js';
-import { getToken, saveSession, clearSession, apiGetProfile, apiUpdateProfile, apiDeleteProfile, apiGetMatches, apiGetMatchMessages, apiPostVoiceNote } from './api.js';
+import { getToken, saveSession, clearSession, apiGetProfile, apiUpdateProfile, apiDeleteProfile, apiGetMatches, apiGetMatchMessages, apiPostVoiceNote, apiPostChatImage } from './api.js';
 import { initials, setLoading, compressPic } from './utils.js';
 import { initLocation, showLocBanner } from './location.js';
 import { initMatchmaking } from './matchmaking.js';
@@ -311,7 +311,16 @@ function appendPermanentMsg(msg, partner) {
   const label = isMe ? 'You' : (partner?.displayName || msg.senderName);
   const div   = document.createElement('div');
 
-  if (msg.type === 'voice') {
+  if (msg.type === 'image') {
+    div.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-them'} msg-image`;
+    div.innerHTML = `
+      <div class="msg-label">${label}</div>
+      <div class="msg-image-wrap">
+        <img src="${msg.imageData}" alt="Shared photo" class="msg-image-thumb" />
+      </div>`;
+    const img = div.querySelector('.msg-image-thumb');
+    img.addEventListener('click', () => openImageLightbox(msg.imageData));
+  } else if (msg.type === 'voice') {
     div.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-them'} msg-voice`;
     div.innerHTML = `
       <div class="msg-label">${label}</div>
@@ -362,6 +371,46 @@ function sendPermanentMsg() {
 
 document.getElementById('chats-msg-send').addEventListener('click', sendPermanentMsg);
 chatsMsgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendPermanentMsg(); });
+
+// ── IMAGE SENDING (reuses compressPic from utils.js — same compression as signup) ──
+const chatImageInput = document.getElementById('chat-image-input');
+const chatImageBtn   = document.getElementById('chat-image-btn');
+
+chatImageBtn.addEventListener('click', () => {
+  chatImageInput.click();
+});
+
+chatImageInput.addEventListener('change', async () => {
+  const rawFile = chatImageInput.files[0];
+  if (!rawFile || !state.openMatchId) return;
+  // Reuse the same compressPic function used during signup for image compression
+  const compressed = await compressPic(rawFile);
+  if (!compressed) { toast('Could not process image'); return; }
+  try {
+    await apiPostChatImage(state.token, state.openMatchId, compressed);
+  } catch {
+    toast('Could not send image');
+  } finally {
+    chatImageInput.value = '';
+  }
+});
+
+// ── IMAGE LIGHTBOX ──
+function openImageLightbox(src) {
+  const overlay = document.getElementById('image-lightbox');
+  const img     = document.getElementById('lightbox-img');
+  img.src = src;
+  overlay.classList.add('visible');
+}
+function closeImageLightbox() {
+  const overlay = document.getElementById('image-lightbox');
+  overlay.classList.remove('visible');
+  document.getElementById('lightbox-img').src = '';
+}
+document.getElementById('image-lightbox').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget || e.target.id === 'lightbox-close-btn') closeImageLightbox();
+});
+document.getElementById('lightbox-close-btn').addEventListener('click', closeImageLightbox);
 
 document.getElementById('btn-chats-back').addEventListener('click', () => {
   state.openMatchId = null;
