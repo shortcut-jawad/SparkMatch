@@ -193,10 +193,18 @@ export function appendMsg(msg, name, isMe, isSystem = false) {
 
 function sendChat() {
   const msg = chatInput.value.trim();
-  if (!msg || !state.partnerId) return;
-  socket.emit('chat_message', { message: msg, to: state.partnerId });
-  appendMsg(msg, state.currentUser?.displayName || 'You', true);
-  chatInput.value = '';
+  if (!msg) return;
+  // Check if we're in a permanent chat video call (call-screen with chat-call-mode)
+  const isChatCallMode = document.querySelector('.video-area')?.classList.contains('chat-call-mode');
+  if (isChatCallMode && state.chatCallMatchId) {
+    socket.emit('permanent_message', { matchId: state.chatCallMatchId, text: msg });
+    appendMsg(msg, state.currentUser?.displayName || 'You', true);
+    chatInput.value = '';
+  } else if (state.partnerId) {
+    socket.emit('chat_message', { message: msg, to: state.partnerId });
+    appendMsg(msg, state.currentUser?.displayName || 'You', true);
+    chatInput.value = '';
+  }
 }
 
 document.getElementById('chat-send').addEventListener('click', sendChat);
@@ -492,6 +500,12 @@ document.getElementById('btn-chat-video-call').addEventListener('click', () => {
 });
 
 socket.on('permanent_message', (msg) => {
+  // If in a chat-call-mode video call for this match, show in sidebar chat too
+  const isChatCallMode = document.querySelector('.video-area')?.classList.contains('chat-call-mode');
+  if (isChatCallMode && msg.matchId === state.chatCallMatchId && msg.senderId !== state.currentUser?.id) {
+    appendMsg(msg.text, msg.senderName, false);
+  }
+
   if (msg.matchId !== state.openMatchId) {
     // Update last message preview if list is visible
     if (state.currentScreen === 'chats' && chatsListView.style.display !== 'none') loadMatches();
@@ -538,7 +552,7 @@ window.showScreen      = showScreen;
     // Init sub-systems
     initMatchmaking({ showScreen, toast, doJoinWaiting });
     initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg });
-    initChatCall({ toast });
+    initChatCall({ toast, showScreen, appendMsg });
   } catch {
     clearSession();
     window.location.replace('/');

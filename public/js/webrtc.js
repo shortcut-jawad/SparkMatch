@@ -2,6 +2,7 @@
 import { socket } from './socket.js';
 import { state }  from './state.js';
 import { initials } from './utils.js';
+import { endChatCall } from './chat/chatCall.js';
 
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
 
@@ -115,38 +116,58 @@ export function initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg }) {
     setTimeout(() => banner.classList.remove('show'), 8000);
   });
 
+  // ── Helper: detect if call-screen is being used for a permanent chat video call ──
+  function _isChatCallMode() {
+    return document.querySelector('.video-area')?.classList.contains('chat-call-mode');
+  }
+
   // ── Controls ──
   document.getElementById('btn-end').addEventListener('click', () => {
+    if (_isChatCallMode()) {
+      endChatCall(true);
+      return;
+    }
     endCall(true);
     showScreen('home');
   });
 
   document.getElementById('btn-skip-call').addEventListener('click', () => {
+    if (_isChatCallMode()) return; // hidden via CSS, but guard anyway
     if (!state.partnerId) return;
     endCall(true);
     doJoinWaiting();
   });
 
   document.getElementById('btn-mute').addEventListener('click', () => {
-    if (!state.localStream) return;
-    state.isMuted = !state.isMuted;
-    state.localStream.getAudioTracks().forEach(t => t.enabled = !state.isMuted);
+    const stream = _isChatCallMode() ? state.chatCallStream : state.localStream;
+    if (!stream) return;
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
     const btn = document.getElementById('btn-mute');
-    btn.classList.toggle('active', state.isMuted);
-    btn.innerHTML = state.isMuted
+    const muted = !track.enabled;
+    btn.classList.toggle('active', muted);
+    btn.innerHTML = muted
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`;
+    // Sync state for matching calls
+    if (!_isChatCallMode()) state.isMuted = muted;
   });
 
   document.getElementById('btn-vid').addEventListener('click', () => {
-    if (!state.localStream) return;
-    state.isCamOff = !state.isCamOff;
-    state.localStream.getVideoTracks().forEach(t => t.enabled = !state.isCamOff);
+    const stream = _isChatCallMode() ? state.chatCallStream : state.localStream;
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    const camOff = !track.enabled;
     const btn = document.getElementById('btn-vid');
-    btn.classList.toggle('active', state.isCamOff);
-    btn.innerHTML = state.isCamOff
+    btn.classList.toggle('active', camOff);
+    btn.innerHTML = camOff
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 11.35V8l6-4v16l-2.47-1.65"/><path d="M11 5l1-1h2"/><path d="m3 3 18 18"/><path d="M3 7H2v13h14"/></svg>`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>`;
+    // Sync state for matching calls
+    if (!_isChatCallMode()) state.isCamOff = camOff;
   });
 
   // Layout toggle (split ↔ PiP)

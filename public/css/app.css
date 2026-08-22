@@ -476,6 +476,15 @@
   background: var(--surface);
 }
 
+/* ── CHAT CALL MODE (reuses call-screen for permanent chat video calls) ── */
+/* Hide like button, next button, and LIVE badge — they only apply to matching calls */
+.video-area.chat-call-mode .like-btn,
+.video-area.chat-call-mode .skip-next,
+.video-area.chat-call-mode .call-live-badge { display: none !important; }
+/* Also hide the like notification and mutual-match banner */
+.video-area.chat-call-mode .call-like-notification,
+.video-area.chat-call-mode .mutual-match-banner { display: none !important; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 640px) {
   #call-screen { flex-direction: column; }
