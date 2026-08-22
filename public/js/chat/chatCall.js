@@ -1,7 +1,7 @@
-// chat/chatCall.js — WebRTC voice & video calls inside permanent chats (reuses existing signaling backend)
 import { socket }   from '../socket.js';
 import { state }    from '../state.js';
 import { initials } from '../utils.js';
+import { populateVideoChatSidebar } from '../app.js';
 
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -34,6 +34,7 @@ export function initChatCall({ toast }) {
     if (matchId !== state.chatCallMatchId) return;
     _showSubview('active');
     _setStatusText('Connecting…');
+    if (state.chatCallType === 'video') populateVideoChatSidebar(matchId);
     await _startPeerConnection(true);
   });
 
@@ -78,6 +79,7 @@ export function initChatCall({ toast }) {
     socket.emit('chat_call_accept', { matchId: state.chatCallMatchId });
     _showSubview('active');
     _setStatusText('Connecting…');
+    if (state.chatCallType === 'video') populateVideoChatSidebar(state.chatCallMatchId);
   });
 
   document.getElementById('chat-call-reject-btn').addEventListener('click', () => {
@@ -185,20 +187,6 @@ export function initChatCall({ toast }) {
 
   document.getElementById('chat-video-send').addEventListener('click', sendChatVideoMsg);
   document.getElementById('chat-video-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatVideoMsg(); });
-
-  // Listen for incoming messages while in the video call to show in sidebar
-  socket.on('permanent_message', (msg) => {
-    if (msg.matchId !== state.chatCallMatchId || msg.senderId === state.currentUser?.id) return;
-    
-    const div = document.createElement('div');
-    div.className = 'msg-bubble msg-them';
-    div.innerHTML = `<div class="msg-label">${msg.senderName}</div>${msg.text}`;
-    const msgs = document.getElementById('chat-video-messages');
-    if (msgs) {
-      msgs.appendChild(div);
-      msgs.scrollTop = msgs.scrollHeight;
-    }
-  });
 }
 
 export function startChatCallInvite(matchId, type, partnerName, partnerPicture) {

@@ -306,7 +306,7 @@ function fmtDuration(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function appendPermanentMsg(msg, partner) {
+export function appendPermanentMsg(msg, partner, container = chatsDetailMsgs) {
   const isMe  = msg.senderId === state.currentUser?.id;
   const label = isMe ? 'You' : (partner?.displayName || msg.senderName);
   const div   = document.createElement('div');
@@ -358,8 +358,22 @@ function appendPermanentMsg(msg, partner) {
     div.innerHTML = `<div class="msg-label">${label}</div>${msg.text}`;
   }
 
-  chatsDetailMsgs.appendChild(div);
-  chatsDetailMsgs.scrollTop = chatsDetailMsgs.scrollHeight;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+export async function populateVideoChatSidebar(matchId) {
+  const msgsContainer = document.getElementById('chat-video-messages');
+  if (!msgsContainer) return;
+  msgsContainer.innerHTML = '';
+  try {
+    const match = state.activeMatches.find(m => m.id === matchId);
+    if (!match) return;
+    const messages = await apiGetMatchMessages(state.token, matchId);
+    messages.forEach(msg => appendPermanentMsg(msg, match.partner, msgsContainer));
+  } catch {
+    toast('Could not load chat history');
+  }
 }
 
 function sendPermanentMsg() {
@@ -493,12 +507,24 @@ document.getElementById('btn-chat-video-call').addEventListener('click', () => {
 
 socket.on('permanent_message', (msg) => {
   if (msg.matchId !== state.openMatchId) {
+    // Check if we are in a video call for this match
+    if (state.chatCallMatchId === msg.matchId) {
+      const match = state.activeMatches.find(m => m.id === msg.matchId);
+      const videoMsgs = document.getElementById('chat-video-messages');
+      if (videoMsgs) appendPermanentMsg(msg, match?.partner, videoMsgs);
+    }
     // Update last message preview if list is visible
     if (state.currentScreen === 'chats' && chatsListView.style.display !== 'none') loadMatches();
     return;
   }
   const match = state.activeMatches.find(m => m.id === msg.matchId);
   appendPermanentMsg(msg, match?.partner);
+  
+  // Also append to video call sidebar if active
+  if (state.chatCallMatchId === msg.matchId) {
+    const videoMsgs = document.getElementById('chat-video-messages');
+    if (videoMsgs) appendPermanentMsg(msg, match?.partner, videoMsgs);
+  }
 });
 
 // ── RECONNECT ──
