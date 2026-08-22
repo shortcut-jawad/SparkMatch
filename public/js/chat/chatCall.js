@@ -1,7 +1,7 @@
+// chat/chatCall.js — WebRTC voice & video calls inside permanent chats (reuses existing signaling backend)
 import { socket }   from '../socket.js';
 import { state }    from '../state.js';
 import { initials } from '../utils.js';
-import { populateVideoChatSidebar, handleImageInputFile } from '../app.js';
 
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -34,7 +34,6 @@ export function initChatCall({ toast }) {
     if (matchId !== state.chatCallMatchId) return;
     _showSubview('active');
     _setStatusText('Connecting…');
-    if (state.chatCallType === 'video') populateVideoChatSidebar(matchId);
     await _startPeerConnection(true);
   });
 
@@ -79,7 +78,6 @@ export function initChatCall({ toast }) {
     socket.emit('chat_call_accept', { matchId: state.chatCallMatchId });
     _showSubview('active');
     _setStatusText('Connecting…');
-    if (state.chatCallType === 'video') populateVideoChatSidebar(state.chatCallMatchId);
   });
 
   document.getElementById('chat-call-reject-btn').addEventListener('click', () => {
@@ -169,22 +167,37 @@ export function initChatCall({ toast }) {
     const msg = input.value.trim();
     if (!msg || !state.chatCallMatchId) return;
     
-    // Send as permanent message — the socket.on('permanent_message') listener
-    // in app.js will handle appending to both the main chat and the video sidebar
+    // Send as permanent message since it's a permanent chat anyway
     socket.emit('permanent_message', { matchId: state.chatCallMatchId, text: msg });
+    
+    // The socket.on('permanent_message') in app.js will append it to the main chats list,
+    // but we can also manually append it to the temporary sidebar here for immediate feedback, 
+    // or rely on the socket listener. We'll append it manually here too.
+    const div = document.createElement('div');
+    div.className = 'msg-bubble msg-me';
+    div.innerHTML = `<div class="msg-label">You</div>${msg}`;
+    const msgs = document.getElementById('chat-video-messages');
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    
     input.value = '';
   }
 
   document.getElementById('chat-video-send').addEventListener('click', sendChatVideoMsg);
   document.getElementById('chat-video-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatVideoMsg(); });
 
-  // Image upload in video call sidebar
-  const chatVideoImageBtn = document.getElementById('chat-video-image-btn');
-  const chatVideoImageInput = document.getElementById('chat-video-image-input');
-  chatVideoImageBtn.addEventListener('click', () => chatVideoImageInput.click());
-  chatVideoImageInput.addEventListener('change', () => {
-    handleImageInputFile(chatVideoImageInput.files[0], state.chatCallMatchId);
-    chatVideoImageInput.value = '';
+  // Listen for incoming messages while in the video call to show in sidebar
+  socket.on('permanent_message', (msg) => {
+    if (msg.matchId !== state.chatCallMatchId || msg.senderId === state.currentUser?.id) return;
+    
+    const div = document.createElement('div');
+    div.className = 'msg-bubble msg-them';
+    div.innerHTML = `<div class="msg-label">${msg.senderName}</div>${msg.text}`;
+    const msgs = document.getElementById('chat-video-messages');
+    if (msgs) {
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
   });
 }
 
@@ -196,12 +209,7 @@ export function startChatCallInvite(matchId, type, partnerName, partnerPicture) 
   document.getElementById('chat-call-ringing-type').textContent =
     type === 'video' ? 'Video Call' : 'Voice Call';
   _showSubview('ringing');
-  socket.emit('chat_call_invite', { 
-    matchId, 
-    type,
-    callerName: state.currentUser?.displayName,
-    callerPicture: state.currentUser?.picture
-  });
+  socket.emit('chat_call_invite', { matchId, type });
 }
 
 export function endChatCall(notify = true) {
@@ -300,28 +308,13 @@ async function _startPeerConnection(isInitiator) {
 }
 
 function _setPartnerUI(name, picture) {
-  // Set name in all elements
   const nameEls = document.querySelectorAll('.chat-call-partner-name');
   nameEls.forEach(el => { el.textContent = name || ''; });
-
-  // Set large avatar (for ringing/incoming/voice-active overlay panels)
-  const overlayPicWraps = document.querySelectorAll('.chat-call-avatar-wrap.chat-call-partner-pic-wrap');
-  const overlayContent = picture
+  const picWraps = document.querySelectorAll('.chat-call-partner-pic-wrap');
+  const content  = picture
     ? `<img src="${picture}" class="chat-call-avatar-img" alt="" />`
     : `<div class="chat-call-avatar-init">${initials(name || '?')}</div>`;
-  overlayPicWraps.forEach(wrap => { wrap.innerHTML = overlayContent; });
-
-  // Set small header pic (for video call top-left, same style as matching call)
-  const headerPicWrap = document.getElementById('chat-call-header-pic-wrap');
-  if (headerPicWrap) {
-    headerPicWrap.innerHTML = picture
-      ? `<img class="call-partner-pic" src="${picture}" alt="" />`
-      : `<div class="call-partner-placeholder">${initials(name || '?')}</div>`;
-  }
-
-  // Set sidebar title
-  const sidebarTitle = document.getElementById('chat-video-title');
-  if (sidebarTitle) sidebarTitle.textContent = `Chat with ${name || ''}`;
+  picWraps.forEach(wrap => { wrap.innerHTML = content; });
 }
 
 function _markConnected() {
