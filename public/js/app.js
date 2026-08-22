@@ -386,7 +386,6 @@ function sendPermanentMsg() {
 document.getElementById('chats-msg-send').addEventListener('click', sendPermanentMsg);
 chatsMsgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendPermanentMsg(); });
 
-// ── IMAGE SENDING (reuses compressPic from utils.js — same compression as signup) ──
 const chatImageInput = document.getElementById('chat-image-input');
 const chatImageBtn   = document.getElementById('chat-image-btn');
 
@@ -394,18 +393,43 @@ chatImageBtn.addEventListener('click', () => {
   chatImageInput.click();
 });
 
-chatImageInput.addEventListener('change', async () => {
-  const rawFile = chatImageInput.files[0];
-  if (!rawFile || !state.openMatchId) return;
-  // Reuse the same compressPic function used during signup for image compression
-  const compressed = await compressPic(rawFile);
+let pendingImageFile = null;
+let pendingImageMatchId = null;
+
+const imageSendModal = document.getElementById('image-send-modal');
+const imageSendPreview = document.getElementById('image-send-preview');
+
+export function handleImageInputFile(file, matchId) {
+  if (!file || !matchId) return;
+  pendingImageFile = file;
+  pendingImageMatchId = matchId;
+  imageSendPreview.src = URL.createObjectURL(file);
+  imageSendModal.classList.add('open'); // reusing open class for modals
+}
+
+chatImageInput.addEventListener('change', () => {
+  handleImageInputFile(chatImageInput.files[0], state.openMatchId);
+  chatImageInput.value = ''; // Reset input
+});
+
+document.getElementById('image-send-close-btn').addEventListener('click', () => {
+  imageSendModal.classList.remove('open');
+  pendingImageFile = null;
+});
+
+document.getElementById('image-send-confirm-btn').addEventListener('click', async () => {
+  if (!pendingImageFile || !pendingImageMatchId) return;
+  imageSendModal.classList.remove('open');
+  
+  const compressed = await compressPic(pendingImageFile);
   if (!compressed) { toast('Could not process image'); return; }
+  
   try {
-    await apiPostChatImage(state.token, state.openMatchId, compressed);
+    await apiPostChatImage(state.token, pendingImageMatchId, compressed);
   } catch {
     toast('Could not send image');
   } finally {
-    chatImageInput.value = '';
+    pendingImageFile = null;
   }
 });
 

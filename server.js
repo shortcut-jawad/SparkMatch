@@ -516,7 +516,7 @@ io.on('connection', (socket) => {
   socket.on('webrtc_ice',     ({ candidate, to })  => io.to(to).emit('webrtc_ice',     { candidate, from: socket.id }));
 
   // ── Chat Call Signaling ──
-  socket.on('chat_call_invite', async ({ matchId, type }) => {
+  socket.on('chat_call_invite', async ({ matchId, type, callerName, callerPicture }) => {
     if (!socket.userId || !matchId) return;
     try {
       await connectDB();
@@ -527,11 +527,12 @@ io.on('connection', (socket) => {
       const partnerSocket  = userSockets[partnerId.toString()];
       if (!partnerSocket) { socket.emit('chat_call_unavailable', { matchId }); return; }
       chatCalls[matchId] = { caller: socket.id, callee: null, type };
+      
       io.to(partnerSocket).emit('chat_call_incoming', {
         matchId,
         type,
-        callerName:    socketProfiles[socket.id]?.displayName || 'Someone',
-        callerPicture: socketProfiles[socket.id]?.picture     || null,
+        callerName:    callerName || socketProfiles[socket.id]?.displayName || 'Someone',
+        callerPicture: callerPicture || socketProfiles[socket.id]?.picture || null,
       });
     } catch (e) { console.error('Chat call invite error:', e); }
   });
