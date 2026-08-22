@@ -391,12 +391,58 @@
   <div id="chat-call-active" style="display:none">
     <!-- Video feeds (shown only for video calls) -->
     <div id="chat-call-video-section" style="display:none">
-      <div class="chat-remote-half">
-        <video id="chat-call-remote-video" autoplay playsinline></video>
+      <div class="video-area">
+
+        <div class="remote-half">
+          <video id="chat-call-remote-video" autoplay playsinline></video>
+          <div class="call-header">
+            <div class="call-partner-info">
+              <div class="chat-call-partner-pic-wrap"></div>
+              <div>
+                <div class="call-partner-name chat-call-partner-name"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="video-divider"></div>
+
+        <div class="local-half">
+          <video id="chat-call-local-video" autoplay playsinline muted></video>
+        </div>
+
+        <div class="controls-bar">
+          <button class="ctrl-btn vid" id="chat-video-btn-vid" title="Camera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          </button>
+          <button class="ctrl-btn mute" id="chat-video-btn-mute" title="Mic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </button>
+          <button class="ctrl-btn end" id="chat-video-btn-end" title="End call">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </button>
+          <button class="ctrl-btn" id="chat-video-btn-layout" title="Toggle layout">
+            <svg id="chat-video-layout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/></svg>
+          </button>
+          <button class="ctrl-btn" id="chat-video-btn-chat" title="Chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </button>
+        </div>
+
       </div>
-      <div class="chat-video-divider"></div>
-      <div class="chat-local-half">
-        <video id="chat-call-local-video"  autoplay playsinline muted></video>
+
+      <div class="sidebar" id="chat-video-sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title" id="chat-video-title">Chat</span>
+          <button class="sidebar-close-btn" id="chat-video-btn-close-chat" title="Close chat">&#x2715;</button>
+        </div>
+        <div class="chat-messages" id="chat-video-messages"></div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <input type="text" id="chat-video-input" placeholder="Type a message..." maxlength="200" />
+            <button class="chat-send-btn" id="chat-video-send">Send</button>
+          </div>
+        </div>
       </div>
     </div>
     <!-- Hidden audio element for voice-only calls -->

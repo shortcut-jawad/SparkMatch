@@ -1,6 +1,4 @@
-// chat/chatCall.js — WebRTC voice & video calls inside permanent chats
-// Video calls reuse the matching call-screen UI (with like/next/live hidden via .chat-call-mode)
-// Voice calls still use the chat-call-overlay panel
+// chat/chatCall.js — WebRTC voice & video calls inside permanent chats (reuses existing signaling backend)
 import { socket }   from '../socket.js';
 import { state }    from '../state.js';
 import { initials } from '../utils.js';
@@ -10,18 +8,14 @@ const ICE = { iceServers: [
   { urls: 'stun:stun1.l.google.com:19302' },
 ] };
 
-let _toast       = null;
-let _showScreen  = null;
-let _appendMsg   = null;
-let _callTimer   = null;
-let _callStart   = 0;
+let _toast     = null;
+let _callTimer = null;
+let _callStart = 0;
 
 // ── Public API ──
 
-export function initChatCall({ toast, showScreen, appendMsg }) {
-  _toast      = toast;
-  _showScreen = showScreen;
-  _appendMsg  = appendMsg;
+export function initChatCall({ toast }) {
+  _toast = toast;
 
   socket.on('chat_call_incoming', ({ matchId, type, callerName, callerPicture }) => {
     if (state.chatCallPc) {
@@ -38,13 +32,8 @@ export function initChatCall({ toast, showScreen, appendMsg }) {
 
   socket.on('chat_call_accepted', async ({ matchId }) => {
     if (matchId !== state.chatCallMatchId) return;
-    if (state.chatCallType === 'video') {
-      // Switch to the reused call-screen for video
-      _activateVideoCallScreen();
-    } else {
-      _showSubview('active');
-      _setStatusText('Connecting…');
-    }
+    _showSubview('active');
+    _setStatusText('Connecting…');
     await _startPeerConnection(true);
   });
 
@@ -61,13 +50,7 @@ export function initChatCall({ toast, showScreen, appendMsg }) {
   });
 
   socket.on('chat_call_offer', async ({ offer }) => {
-    if (!state.chatCallPc) {
-      // Answering side: if video, also switch to call-screen
-      if (state.chatCallType === 'video') {
-        _activateVideoCallScreen();
-      }
-      await _startPeerConnection(false);
-    }
+    if (!state.chatCallPc) await _startPeerConnection(false);
     await state.chatCallPc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await state.chatCallPc.createAnswer();
     await state.chatCallPc.setLocalDescription(answer);
@@ -93,12 +76,8 @@ export function initChatCall({ toast, showScreen, appendMsg }) {
   // ── Accept / Reject / Cancel ──
   document.getElementById('chat-call-accept-btn').addEventListener('click', () => {
     socket.emit('chat_call_accept', { matchId: state.chatCallMatchId });
-    if (state.chatCallType === 'video') {
-      _activateVideoCallScreen();
-    } else {
-      _showSubview('active');
-      _setStatusText('Connecting…');
-    }
+    _showSubview('active');
+    _setStatusText('Connecting…');
   });
 
   document.getElementById('chat-call-reject-btn').addEventListener('click', () => {
@@ -116,7 +95,7 @@ export function initChatCall({ toast, showScreen, appendMsg }) {
     endChatCall(false);
   });
 
-  // ── In-call controls (voice-only overlay) ──
+  // ── In-call controls (Voice) ──
   document.getElementById('chat-call-mute-btn').addEventListener('click', () => {
     if (!state.chatCallStream) return;
     const track = state.chatCallStream.getAudioTracks()[0];
@@ -127,25 +106,98 @@ export function initChatCall({ toast, showScreen, appendMsg }) {
     btn.title = track.enabled ? 'Mute' : 'Unmute';
   });
 
-  document.getElementById('chat-call-cam-btn').addEventListener('click', () => {
+  // ── In-call controls (Video) ──
+  document.getElementById('chat-video-btn-end').addEventListener('click', () => {
+    socket.emit('chat_call_end', { matchId: state.chatCallMatchId });
+    endChatCall(false);
+  });
+
+  document.getElementById('chat-video-btn-mute').addEventListener('click', () => {
+    if (!state.chatCallStream) return;
+    const track = state.chatCallStream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    const btn = document.getElementById('chat-video-btn-mute');
+    btn.classList.toggle('active', !track.enabled);
+    btn.innerHTML = !track.enabled
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`;
+  });
+
+  document.getElementById('chat-video-btn-vid').addEventListener('click', () => {
     if (!state.chatCallStream) return;
     const track = state.chatCallStream.getVideoTracks()[0];
     if (!track) return;
     track.enabled = !track.enabled;
-    document.getElementById('chat-call-cam-btn').classList.toggle('ctrl-active', !track.enabled);
+    const btn = document.getElementById('chat-video-btn-vid');
+    btn.classList.toggle('active', !track.enabled);
+    btn.innerHTML = !track.enabled
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 11.35V8l6-4v16l-2.47-1.65"/><path d="M11 5l1-1h2"/><path d="m3 3 18 18"/><path d="M3 7H2v13h14"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>`;
   });
 
-  // Layout toggle (split ↔ PiP) — for voice-only overlay
-  const chatVideoSec = document.getElementById('chat-call-video-section');
-  const chatBtnLayout = document.getElementById('chat-call-layout-btn');
-  const chatLayoutIcon = document.getElementById('chat-call-layout-icon');
+  const chatVideoArea = document.querySelector('#chat-call-video-section .video-area');
+  const chatVideoBtnLayout = document.getElementById('chat-video-btn-layout');
+  const chatVideoLayoutIcon = document.getElementById('chat-video-layout-icon');
   const SPLIT_ICON = `<rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/>`;
   const PIP_ICON   = `<rect x="2" y="2" width="20" height="20" rx="2"/><rect x="13" y="13" width="8" height="6" rx="1" fill="currentColor" stroke="none"/>`;
 
-  chatBtnLayout.addEventListener('click', () => {
-    const pip = chatVideoSec.classList.toggle('pip');
-    chatBtnLayout.classList.toggle('ctrl-active', pip);
-    chatLayoutIcon.innerHTML = pip ? SPLIT_ICON : PIP_ICON;
+  chatVideoBtnLayout.addEventListener('click', () => {
+    const pip = chatVideoArea.classList.toggle('pip');
+    chatVideoBtnLayout.classList.toggle('layout-active', pip);
+    chatVideoLayoutIcon.innerHTML = pip ? SPLIT_ICON : PIP_ICON;
+  });
+
+  // ── Temporary Chat in Video Call ──
+  const chatVideoSidebar = document.getElementById('chat-video-sidebar');
+  const btnChatVideo = document.getElementById('chat-video-btn-chat');
+  
+  function toggleChatVideo(forceOpen) {
+    const open = forceOpen !== undefined ? forceOpen : !chatVideoSidebar.classList.contains('open');
+    chatVideoSidebar.classList.toggle('open', open);
+    btnChatVideo.classList.toggle('chat-active', open);
+    if (open) document.getElementById('chat-video-input').focus();
+  }
+
+  btnChatVideo.addEventListener('click', () => toggleChatVideo());
+  document.getElementById('chat-video-btn-close-chat').addEventListener('click', () => toggleChatVideo(false));
+
+  function sendChatVideoMsg() {
+    const input = document.getElementById('chat-video-input');
+    const msg = input.value.trim();
+    if (!msg || !state.chatCallMatchId) return;
+    
+    // Send as permanent message since it's a permanent chat anyway
+    socket.emit('permanent_message', { matchId: state.chatCallMatchId, text: msg });
+    
+    // The socket.on('permanent_message') in app.js will append it to the main chats list,
+    // but we can also manually append it to the temporary sidebar here for immediate feedback, 
+    // or rely on the socket listener. We'll append it manually here too.
+    const div = document.createElement('div');
+    div.className = 'msg-bubble msg-me';
+    div.innerHTML = `<div class="msg-label">You</div>${msg}`;
+    const msgs = document.getElementById('chat-video-messages');
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    
+    input.value = '';
+  }
+
+  document.getElementById('chat-video-send').addEventListener('click', sendChatVideoMsg);
+  document.getElementById('chat-video-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatVideoMsg(); });
+
+  // Listen for incoming messages while in the video call to show in sidebar
+  socket.on('permanent_message', (msg) => {
+    if (msg.matchId !== state.chatCallMatchId || msg.senderId === state.currentUser?.id) return;
+    
+    const div = document.createElement('div');
+    div.className = 'msg-bubble msg-them';
+    div.innerHTML = `<div class="msg-label">${msg.senderName}</div>${msg.text}`;
+    const msgs = document.getElementById('chat-video-messages');
+    if (msgs) {
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
   });
 }
 
@@ -154,9 +206,6 @@ export function startChatCallInvite(matchId, type, partnerName, partnerPicture) 
   state.chatCallMatchId = matchId;
   state.chatCallType    = type;
   _setPartnerUI(partnerName, partnerPicture);
-  // Store partner info for video call screen reuse
-  state._chatCallPartnerName    = partnerName;
-  state._chatCallPartnerPicture = partnerPicture;
   document.getElementById('chat-call-ringing-type').textContent =
     type === 'video' ? 'Video Call' : 'Voice Call';
   _showSubview('ringing');
@@ -172,39 +221,6 @@ export function endChatCall(notify = true) {
     state.chatCallStream.getTracks().forEach(t => t.stop());
     state.chatCallStream = null;
   }
-
-  // Clean up video call screen (if video call was using it)
-  if (state.chatCallType === 'video' || state._chatCallWasVideo) {
-    // Clear the reused call-screen videos
-    const rv = document.getElementById('remote-video');
-    const lv = document.getElementById('local-video');
-    if (rv) rv.srcObject = null;
-    if (lv) lv.srcObject = null;
-
-    // Remove chat-call-mode class
-    const videoArea = document.querySelector('.video-area');
-    if (videoArea) videoArea.classList.remove('chat-call-mode');
-
-    // Close chat sidebar if open
-    const chatSidebar = document.getElementById('chat-sidebar');
-    if (chatSidebar) chatSidebar.classList.remove('open');
-    const btnChat = document.getElementById('btn-chat');
-    if (btnChat) btnChat.classList.remove('chat-active');
-
-    // Reset layout
-    if (videoArea) videoArea.classList.remove('pip');
-    const layoutBtn = document.getElementById('btn-layout');
-    if (layoutBtn) layoutBtn.classList.remove('layout-active');
-    const layoutIcon = document.getElementById('layout-icon');
-    if (layoutIcon) {
-      layoutIcon.innerHTML = `<rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/>`;
-    }
-
-    // Go back to chats screen
-    if (_showScreen) _showScreen('chats');
-  }
-
-  // Clean up voice-only overlay elements
   ['chat-call-remote-video', 'chat-call-local-video'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.srcObject = null;
@@ -212,76 +228,42 @@ export function endChatCall(notify = true) {
   const ra = document.getElementById('chat-call-remote-audio');
   if (ra) ra.srcObject = null;
 
-  state._chatCallWasVideo = state.chatCallType === 'video';
   state.chatCallMatchId = null;
   state.chatCallType    = null;
-  state._chatCallPartnerName    = null;
-  state._chatCallPartnerPicture = null;
   clearInterval(_callTimer);
 
-  // Reset layout state for voice overlay
-  const videoSec = document.getElementById('chat-call-video-section');
-  if (videoSec) videoSec.classList.remove('pip');
-  const chatBtnLayout = document.getElementById('chat-call-layout-btn');
-  if (chatBtnLayout) chatBtnLayout.classList.remove('ctrl-active');
-  const chatLayoutIcon = document.getElementById('chat-call-layout-icon');
-  if (chatLayoutIcon) {
-    chatLayoutIcon.innerHTML = `<rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/>`;
-  }
+  // Reset layout state
+  const chatVideoArea = document.querySelector('#chat-call-video-section .video-area');
+  if (chatVideoArea) chatVideoArea.classList.remove('pip');
+  const chatVideoBtnLayout = document.getElementById('chat-video-btn-layout');
+  if (chatVideoBtnLayout) chatVideoBtnLayout.classList.remove('layout-active');
+  const chatVideoLayoutIcon = document.getElementById('chat-video-layout-icon');
+  if (chatVideoLayoutIcon) chatVideoLayoutIcon.innerHTML = `<rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/>`;
 
+  // Reset chat sidebar
+  const chatVideoSidebar = document.getElementById('chat-video-sidebar');
+  if (chatVideoSidebar) chatVideoSidebar.classList.remove('open');
+  const btnChatVideo = document.getElementById('chat-video-btn-chat');
+  if (btnChatVideo) btnChatVideo.classList.remove('chat-active');
+  
   _hideOverlay();
 }
 
 // ── Private helpers ──
 
-/**
- * Activate the matching call-screen for a permanent-chat video call.
- * Sets partner info on the call-screen UI and adds `chat-call-mode`
- * to hide like/next/live elements.
- */
-function _activateVideoCallScreen() {
-  _hideOverlay(); // hide ringing/incoming overlay
-
-  const name = state._chatCallPartnerName || '';
-  const pic  = state._chatCallPartnerPicture;
-
-  // Set partner name
-  document.getElementById('call-partner-name').textContent = name || '—';
-
-  // Set partner pic
-  const wrap = document.getElementById('call-partner-pic-wrap');
-  wrap.innerHTML = pic
-    ? `<img class="call-partner-pic" src="${pic}" alt="" />`
-    : `<div class="call-partner-placeholder">${initials(name)}</div>`;
-
-  // Set chat title
-  document.getElementById('chat-title').textContent = `Chat with ${name}`;
-  document.getElementById('chat-messages').innerHTML = '';
-
-  // Add chat-call-mode class to hide like/next/live
-  const videoArea = document.querySelector('.video-area');
-  if (videoArea) videoArea.classList.add('chat-call-mode');
-
-  // Show call screen
-  if (_showScreen) _showScreen('call');
-}
-
 async function _startPeerConnection(isInitiator) {
   const type = state.chatCallType;
-  const isVideo = type === 'video';
-
   try {
     state.chatCallStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: isVideo,
+      video: type === 'video',
     });
-    if (isVideo) {
-      // Use the main call-screen local video element
-      const lv = document.getElementById('local-video');
+    if (type === 'video') {
+      const lv = document.getElementById('chat-call-local-video');
       if (lv) lv.srcObject = state.chatCallStream;
     }
   } catch {
-    _toast?.('Could not access ' + (isVideo ? 'camera/microphone' : 'microphone'));
+    _toast?.('Could not access ' + (type === 'video' ? 'camera/microphone' : 'microphone'));
     endChatCall(true);
     return;
   }
@@ -290,9 +272,8 @@ async function _startPeerConnection(isInitiator) {
   state.chatCallStream.getTracks().forEach(t => state.chatCallPc.addTrack(t, state.chatCallStream));
 
   state.chatCallPc.ontrack = e => {
-    if (isVideo) {
-      // Use the main call-screen remote video element
-      const rv = document.getElementById('remote-video');
+    if (type === 'video') {
+      const rv = document.getElementById('chat-call-remote-video');
       if (rv) rv.srcObject = e.streams[0];
     } else {
       const ra = document.getElementById('chat-call-remote-audio');
@@ -312,18 +293,12 @@ async function _startPeerConnection(isInitiator) {
     if (cs === 'failed') { endChatCall(true); _toast?.('Call connection failed'); }
   };
 
-  if (!isVideo) {
-    // Show correct UI for voice-only call (overlay)
-    const videoSec = document.getElementById('chat-call-video-section');
-    const camWrap  = document.getElementById('chat-call-cam-wrap');
-    const layoutWrap = document.getElementById('chat-call-layout-wrap');
-    if (videoSec) videoSec.style.display = 'none';
-    if (camWrap)  camWrap.style.display  = 'none';
-    if (layoutWrap) layoutWrap.style.display = 'none';
-    _showSubview('active');
-    _setStatusText('Connecting…');
-  }
-  // For video, the call-screen is already shown via _activateVideoCallScreen()
+  // Show correct UI for call type
+  const videoSec = document.getElementById('chat-call-video-section');
+  const chatPanel = document.querySelector('#chat-call-active .chat-call-panel');
+  
+  if (videoSec) videoSec.style.display = type === 'video' ? 'flex' : 'none';
+  if (chatPanel) chatPanel.style.display = type === 'video' ? 'none' : 'flex';
 
   if (isInitiator) {
     const offer = await state.chatCallPc.createOffer();
@@ -333,10 +308,6 @@ async function _startPeerConnection(isInitiator) {
 }
 
 function _setPartnerUI(name, picture) {
-  // Store for later use when activating video call screen
-  state._chatCallPartnerName    = name;
-  state._chatCallPartnerPicture = picture;
-
   const nameEls = document.querySelectorAll('.chat-call-partner-name');
   nameEls.forEach(el => { el.textContent = name || ''; });
   const picWraps = document.querySelectorAll('.chat-call-partner-pic-wrap');
@@ -347,9 +318,7 @@ function _setPartnerUI(name, picture) {
 }
 
 function _markConnected() {
-  if (state.chatCallType !== 'video') {
-    _setStatusText('');
-  }
+  _setStatusText('');
   _callStart = Date.now();
   clearInterval(_callTimer);
   _callTimer = setInterval(() => {
