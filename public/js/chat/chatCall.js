@@ -2,10 +2,7 @@
 import { socket }   from '../socket.js';
 import { state }    from '../state.js';
 import { initials } from '../utils.js';
-<<<<<<< HEAD
-=======
 import { populateVideoChatSidebar, handleImageInputFile } from '../app.js';
->>>>>>> 491caa0 (Fix duplicate chat messages, caller UI info, image preview modal, and CI pipeline)
 
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
