@@ -9,35 +9,32 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
-
+        node-version: [20.x, 22.x]
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-    - name: Install dependencies
-      # Use --omit=dev as requested by NPM in production environments (also fulfills your previous warning)
-      run: npm ci
+      - name: Install dependencies
+        run: npm install
 
-    - name: Check for syntax errors (Basic Test)
-      run: |
-        node -c server.js
-        node -c public/js/app.js
-        node -c public/js/state.js
-        node -c public/js/utils.js
-        node -c public/js/socket.js
-        node -c public/js/api.js
-        node -c public/js/location.js
-        node -c public/js/matchmaking.js
-        node -c public/js/webrtc.js
-        node -c public/js/chat/voiceRecorder.js
-        node -c public/js/chat/chatCall.js
+      - name: Check for syntax errors (Basic Test)
+        run: |
+          node -c server.js
+          node -c public/js/app.js
+          node -c public/js/state.js
+          node -c public/js/utils.js
+          node -c public/js/socket.js
+          node -c public/js/api.js
+          node -c public/js/location.js
+          node -c public/js/matchmaking.js
+          node -c public/js/webrtc.js
+          node -c public/js/chat/voiceRecorder.js
+          node -c public/js/chat/chatCall.js
