@@ -21,20 +21,15 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-
       - name: Install dependencies
         run: npm install
 
-      - name: Check for syntax errors (Basic Test)
+      - name: Check server syntax
+        run: node -c server.js
+
+      - name: Check frontend syntax (ES modules)
         run: |
-          node -c server.js
-          node -c public/js/app.js
-          node -c public/js/state.js
-          node -c public/js/utils.js
-          node -c public/js/socket.js
-          node -c public/js/api.js
-          node -c public/js/location.js
-          node -c public/js/matchmaking.js
-          node -c public/js/webrtc.js
-          node -c public/js/chat/voiceRecorder.js
-          node -c public/js/chat/chatCall.js
+          for f in public/js/app.js public/js/state.js public/js/utils.js public/js/socket.js public/js/api.js public/js/location.js public/js/matchmaking.js public/js/webrtc.js public/js/chat/voiceRecorder.js public/js/chat/chatCall.js; do
+            echo "Checking $f"
+            node --input-type=module --check < "$f"
+          done
