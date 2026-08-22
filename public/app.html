@@ -275,6 +275,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="image-send-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Send Picture</h3>
+      <button class="btn-icon" id="image-send-close-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <img id="image-send-preview" src="" alt="Preview" style="max-width:100%; border-radius:var(--radius); max-height: 400px; object-fit: contain;" />
+    </div>
+    <div class="modal-footer" style="justify-content: flex-end;">
+      <button class="btn" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white;" id="image-send-confirm-btn">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ EDIT PROFILE MODAL ══ -->
 <div class="modal-overlay" id="edit-modal">
   <div class="modal">
@@ -397,7 +414,7 @@
           <video id="chat-call-remote-video" autoplay playsinline></video>
           <div class="call-header">
             <div class="call-partner-info">
-              <div class="chat-call-partner-pic-wrap"></div>
+              <div id="chat-call-header-pic-wrap" class="chat-call-partner-pic-wrap"></div>
               <div>
                 <div class="call-partner-name chat-call-partner-name"></div>
               </div>
@@ -439,6 +456,10 @@
         <div class="chat-messages" id="chat-video-messages"></div>
         <div class="chat-input-area">
           <div class="chat-input-wrap">
+            <button class="btn-icon" id="chat-video-image-btn" title="Send picture" style="width:34px;height:34px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <input type="file" id="chat-video-image-input" accept="image/*" style="display:none" />
             <input type="text" id="chat-video-input" placeholder="Type a message..." maxlength="200" />
             <button class="chat-send-btn" id="chat-video-send">Send</button>
           </div>
