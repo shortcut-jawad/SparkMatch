@@ -1,8 +1,19 @@
 // chat/chatCall.js — WebRTC voice & video calls inside permanent chats (reuses existing signaling backend)
 import { socket }   from '../socket.js';
 import { state }    from '../state.js';
-import { initials } from '../utils.js';
-import { populateVideoChatSidebar, handleImageInputFile } from '../app.js';
+import { initials, compressPic } from '../utils.js';
+import { apiPostChatImage } from '../api.js';
+import { populateVideoChatSidebar } from '../app.js';
+
+let pendingVideoImageFile = null;
+
+function clearVideoImagePreview() {
+  pendingVideoImageFile = null;
+  const bar = document.getElementById('chat-video-image-preview-bar');
+  const img = document.getElementById('chat-video-image-preview-img');
+  if (bar) bar.style.display = 'none';
+  if (img) img.src = '';
+}
 
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -163,28 +174,59 @@ export function initChatCall({ toast }) {
   btnChatVideo.addEventListener('click', () => toggleChatVideo());
   document.getElementById('chat-video-btn-close-chat').addEventListener('click', () => toggleChatVideo(false));
 
-  function sendChatVideoMsg() {
+  const chatVideoImageBtn          = document.getElementById('chat-video-image-btn');
+  const chatVideoImageInput        = document.getElementById('chat-video-image-input');
+  const chatVideoImagePreviewBar    = document.getElementById('chat-video-image-preview-bar');
+  const chatVideoImagePreviewImg    = document.getElementById('chat-video-image-preview-img');
+  const chatVideoImagePreviewRemove = document.getElementById('chat-video-image-preview-remove');
+
+  chatVideoImageBtn.addEventListener('click', () => chatVideoImageInput.click());
+
+  chatVideoImageInput.addEventListener('change', () => {
+    const file = chatVideoImageInput.files[0];
+    if (!file || !state.chatCallMatchId) return;
+    pendingVideoImageFile = file;
+    chatVideoImagePreviewImg.src = URL.createObjectURL(file);
+    chatVideoImagePreviewBar.style.display = 'flex';
+    chatVideoImageInput.value = '';
+  });
+
+  if (chatVideoImagePreviewRemove) {
+    chatVideoImagePreviewRemove.addEventListener('click', clearVideoImagePreview);
+  }
+
+  async function sendChatVideoMsg() {
     const input = document.getElementById('chat-video-input');
     const msg = input.value.trim();
-    if (!msg || !state.chatCallMatchId) return;
-    
-    // Send as permanent message — the socket.on('permanent_message') listener
-    // in app.js will handle appending to both the main chat and the video sidebar
-    socket.emit('permanent_message', { matchId: state.chatCallMatchId, text: msg });
+    const fileToSend = pendingVideoImageFile;
+    const matchId = state.chatCallMatchId;
+
+    if (!msg && !fileToSend) return;
+    if (!matchId) return;
+
     input.value = '';
+    clearVideoImagePreview();
+
+    if (fileToSend) {
+      const compressed = await compressPic(fileToSend);
+      if (compressed) {
+        try {
+          await apiPostChatImage(state.token, matchId, compressed);
+        } catch {
+          _toast?.('Could not send image');
+        }
+      } else {
+        _toast?.('Could not process image');
+      }
+    }
+
+    if (msg) {
+      socket.emit('permanent_message', { matchId, text: msg });
+    }
   }
 
   document.getElementById('chat-video-send').addEventListener('click', sendChatVideoMsg);
   document.getElementById('chat-video-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatVideoMsg(); });
-
-  // Image upload in video call sidebar
-  const chatVideoImageBtn = document.getElementById('chat-video-image-btn');
-  const chatVideoImageInput = document.getElementById('chat-video-image-input');
-  chatVideoImageBtn.addEventListener('click', () => chatVideoImageInput.click());
-  chatVideoImageInput.addEventListener('change', () => {
-    handleImageInputFile(chatVideoImageInput.files[0], state.chatCallMatchId);
-    chatVideoImageInput.value = '';
-  });
 }
 
 export function startChatCallInvite(matchId, type, partnerName, partnerPicture) {
@@ -204,6 +246,7 @@ export function startChatCallInvite(matchId, type, partnerName, partnerPicture) 
 }
 
 export function endChatCall(notify = true) {
+  clearVideoImagePreview();
   if (notify && state.chatCallMatchId) {
     socket.emit('chat_call_end', { matchId: state.chatCallMatchId });
   }

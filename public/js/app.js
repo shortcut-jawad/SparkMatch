@@ -376,62 +376,67 @@ export async function populateVideoChatSidebar(matchId) {
   }
 }
 
-function sendPermanentMsg() {
+let pendingMainImageFile = null;
+
+const chatImageInput        = document.getElementById('chat-image-input');
+const chatImageBtn          = document.getElementById('chat-image-btn');
+const chatImagePreviewBar    = document.getElementById('chat-image-preview-bar');
+const chatImagePreviewImg    = document.getElementById('chat-image-preview-img');
+const chatImagePreviewRemove = document.getElementById('chat-image-preview-remove');
+
+chatImageBtn.addEventListener('click', () => chatImageInput.click());
+
+chatImageInput.addEventListener('change', () => {
+  const file = chatImageInput.files[0];
+  if (!file || !state.openMatchId) return;
+  pendingMainImageFile = file;
+  chatImagePreviewImg.src = URL.createObjectURL(file);
+  chatImagePreviewBar.style.display = 'flex';
+  chatImageInput.value = '';
+});
+
+export function clearMainImagePreview() {
+  pendingMainImageFile = null;
+  if (chatImagePreviewBar) chatImagePreviewBar.style.display = 'none';
+  if (chatImagePreviewImg) chatImagePreviewImg.src = '';
+}
+
+if (chatImagePreviewRemove) {
+  chatImagePreviewRemove.addEventListener('click', clearMainImagePreview);
+}
+
+async function sendPermanentMsg() {
   const text = chatsMsgInput.value.trim();
-  if (!text || !state.openMatchId) return;
-  socket.emit('permanent_message', { matchId: state.openMatchId, text });
+  const fileToSend = pendingMainImageFile;
+  const matchId = state.openMatchId;
+
+  if (!text && !fileToSend) return;
+  if (!matchId) return;
+
   chatsMsgInput.value = '';
+  clearMainImagePreview();
+
+  if (fileToSend) {
+    const compressed = await compressPic(fileToSend);
+    if (compressed) {
+      try {
+        await apiPostChatImage(state.token, matchId, compressed);
+      } catch {
+        toast('Could not send image');
+      }
+    } else {
+      toast('Could not process image');
+    }
+  }
+
+  if (text) {
+    socket.emit('permanent_message', { matchId, text });
+  }
 }
 
 document.getElementById('chats-msg-send').addEventListener('click', sendPermanentMsg);
 chatsMsgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendPermanentMsg(); });
 
-const chatImageInput = document.getElementById('chat-image-input');
-const chatImageBtn   = document.getElementById('chat-image-btn');
-
-chatImageBtn.addEventListener('click', () => {
-  chatImageInput.click();
-});
-
-let pendingImageFile = null;
-let pendingImageMatchId = null;
-
-const imageSendModal = document.getElementById('image-send-modal');
-const imageSendPreview = document.getElementById('image-send-preview');
-
-export function handleImageInputFile(file, matchId) {
-  if (!file || !matchId) return;
-  pendingImageFile = file;
-  pendingImageMatchId = matchId;
-  imageSendPreview.src = URL.createObjectURL(file);
-  imageSendModal.classList.add('open'); // reusing open class for modals
-}
-
-chatImageInput.addEventListener('change', () => {
-  handleImageInputFile(chatImageInput.files[0], state.openMatchId);
-  chatImageInput.value = ''; // Reset input
-});
-
-document.getElementById('image-send-close-btn').addEventListener('click', () => {
-  imageSendModal.classList.remove('open');
-  pendingImageFile = null;
-});
-
-document.getElementById('image-send-confirm-btn').addEventListener('click', async () => {
-  if (!pendingImageFile || !pendingImageMatchId) return;
-  imageSendModal.classList.remove('open');
-  
-  const compressed = await compressPic(pendingImageFile);
-  if (!compressed) { toast('Could not process image'); return; }
-  
-  try {
-    await apiPostChatImage(state.token, pendingImageMatchId, compressed);
-  } catch {
-    toast('Could not send image');
-  } finally {
-    pendingImageFile = null;
-  }
-});
 
 // ── IMAGE LIGHTBOX ──
 function openImageLightbox(src) {
