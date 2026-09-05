@@ -39,13 +39,13 @@ During a random video match, users can anonymously "like" their conversation par
 
 ## 5. Features
 
-- 🎯 **Geolocated Matchmaking**: Calculates spatial distance between waiting users using the Haversine distance formula to prioritize matches within the closest physical radius.
-- 📹 **Low-Latency WebRTC Video & Audio**: Direct peer-to-peer media streaming negotiated via Socket.IO signaling servers and ICE/STUN candidates.
-- ❤️ **Mutual-Like System**: Anonymous during-call liking mechanism. When both users express mutual interest, a permanent connection is automatically saved to the database.
-- 💬 **Persistent Chat**: Unlocked matches gain access to a dedicated chat room featuring real-time messaging, client-compressed photo uploads, and embedded audio voice notes.
-- 📞 **Direct 1-on-1 Re-Calling**: Re-initiate intentional video or audio calls with permanent connections directly from the chat interface, featuring split-screen and picture-in-picture view modes.
-- 🔐 **Secure Authentication**: User sign-up and sign-in protected by `bcryptjs` password hashing (10 salt rounds) and 7-day stateless JSON Web Tokens (JWT).
-- 🖼️ **Client-Side Media Compression**: Automatic image compression via HTML5 Canvas API before base64 encoding to optimize memory usage and database storage.
+- **Geolocated Matchmaking**: Calculates spatial distance between waiting users using the Haversine distance formula to prioritize matches within the closest physical radius.
+- **Low-Latency WebRTC Video & Audio**: Direct peer-to-peer media streaming negotiated via Socket.IO signaling servers and ICE/STUN candidates.
+- **Mutual-Like System**: Anonymous during-call liking mechanism. When both users express mutual interest, a permanent connection is automatically saved to the database.
+- **Persistent Chat**: Unlocked matches gain access to a dedicated chat room featuring real-time messaging, client-compressed photo uploads, and embedded audio voice notes.
+- **Direct 1-on-1 Re-Calling**: Re-initiate intentional video or audio calls with permanent connections directly from the chat interface, featuring split-screen and picture-in-picture view modes.
+- **Secure Authentication**: User sign-up and sign-in protected by `bcryptjs` password hashing (10 salt rounds) and 7-day stateless JSON Web Tokens (JWT).
+- **Client-Side Media Compression**: Automatic image compression via HTML5 Canvas API before base64 encoding to optimize memory usage and database storage.
 
 ---
 
