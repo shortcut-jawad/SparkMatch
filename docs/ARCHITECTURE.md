@@ -29,7 +29,7 @@ The high-level architecture diagram illustrates the end-to-end interaction betwe
 - **Client Layer (Vanilla JS & Browser APIs)**: Handles HTML5 Media Capture, Geolocation API for coordinate retrieval, WebRTC API for peer-to-peer video/audio streaming, and Canvas API for client-side image compression.
 - **Server Layer (Node.js & Express & Socket.IO)**: Houses RESTful API routes for authentication and profile management, Socket.IO server for matchmaking and real-time signaling, and custom middleware for JWT validation and Multer file parsing.
 - **Database Layer (MongoDB & Mongoose)**: Persists user accounts, permanent match associations, and chat history.
-- **External Services**: Integrates public STUN/TURN servers for WebRTC ICE candidate gathering and Vercel hosting.
+- **External Services**: Integrates public STUN and configurable TURN servers for WebRTC ICE candidate gathering, served to clients via `/api/ice-servers`, with Render hosting.
 
 ---
 
@@ -150,6 +150,7 @@ Overview of HTTP REST routes provided by Express.js.
 | `GET` | `/api/matches/:id/messages` | Yes | Fetch message history for a match |
 | `POST` | `/api/matches/:id/voice-note` | Yes | Upload base64 voice note audio file |
 | `POST` | `/api/matches/:id/image` | Yes | Upload base64 chat image |
+| `GET` | `/api/ice-servers` | Yes | STUN/TURN server list for WebRTC peer connections |
 
 ---
 

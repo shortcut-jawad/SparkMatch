@@ -1,7 +1,7 @@
 // app.js: authenticated app entry point — view router, session init, home/edit/chat screens
 import { state } from './state.js';
 import { socket } from './socket.js';
-import { getToken, saveSession, clearSession, apiGetProfile, apiUpdateProfile, apiDeleteProfile, apiGetMatches, apiGetMatchMessages, apiPostVoiceNote, apiPostChatImage } from './api.js';
+import { getToken, saveSession, clearSession, apiGetProfile, apiUpdateProfile, apiDeleteProfile, apiGetMatches, apiGetMatchMessages, apiPostVoiceNote, apiPostChatImage, apiGetIceConfig } from './api.js';
 import { initials, setLoading, compressPic } from './utils.js';
 import { initLocation, showLocBanner } from './location.js';
 import { initMatchmaking } from './matchmaking.js';
@@ -585,6 +585,8 @@ window.showScreen      = showScreen;
     renderHomeProfile();
     showScreen('home');
     socket.emit('identify', { userId: user.id });
+    // Warm the ICE config cache so call setup doesn't wait on it and miss the partner's offer
+    apiGetIceConfig();
 
     // Location
     const locStatus = initLocation();

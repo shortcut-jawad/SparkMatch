@@ -87,11 +87,9 @@ Follow these steps to set up and run SparkMatch locally on your machine.
    ```
 
 3. **Configure Environment Variables:**
-   Create a `.env` file in the root directory:
-   ```env
-   PORT=3000
-   MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/sparkmatch?retryWrites=true&w=wide
-   JWT_SECRET=your_super_secret_jwt_key_here
+   Copy `.env.example` to `.env` and fill in your values:
+   ```bash
+   cp .env.example .env
    ```
 
 4. **Start the application:**
@@ -124,8 +122,24 @@ The server relies on the following environment variables:
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `PORT` | Number | `3000` | Port number for the Express and Socket.IO server |
-| `MONGO_URI` | String | *Required* | MongoDB connection URI string |
+| `MONGODB_URI` | String | *Required* | MongoDB connection URI string |
 | `JWT_SECRET` | String | `sparkmatch_jwt_secret_2024` | Secret key used to sign and verify JWT authentication tokens |
+| `CF_TURN_KEY_ID` | String | — | Cloudflare Realtime TURN key ID (used with `CF_TURN_API_TOKEN`) |
+| `CF_TURN_API_TOKEN` | String | — | Cloudflare Realtime TURN API token; short-lived credentials are generated server-side |
+| `TURN_URLS` | String | — | Static TURN alternative: comma-separated `turn:`/`turns:` URLs (e.g. Metered Open Relay) |
+| `TURN_USERNAME` | String | — | Username for `TURN_URLS` |
+| `TURN_CREDENTIAL` | String | — | Credential for `TURN_URLS` |
+
+Without TURN variables, calls fall back to STUN only, which fails for some users behind strict NAT or on mobile data. Clients fetch the ICE server list from `GET /api/ice-servers`.
+
+### Deploying to Render (free tier)
+
+The app runs as a single Render web service from `render.yaml`. It must stay one long-running instance, since matchmaking state lives in memory.
+
+1. In Render, choose **New → Blueprint** and select this repository.
+2. Fill in `MONGODB_URI` and one set of TURN variables when prompted. `JWT_SECRET` is generated automatically.
+3. In MongoDB Atlas **Network Access**, allow connections from Render (or `0.0.0.0/0`).
+4. Free instances sleep after ~15 minutes without traffic. To avoid the cold-start delay, ping `https://<your-app>.onrender.com/api/health` every 10 minutes with a free monitor such as cron-job.org or UptimeRobot.
 
 ---
 
@@ -171,22 +185,24 @@ SparkMatch/
 │   └── app.html              # Main video match & chat dashboard
 ├── routes/
 │   ├── authRoutes.js         # Authentication endpoints (/register, /login, /profile)
+│   ├── iceRoutes.js          # WebRTC STUN/TURN server list (/ice-servers)
 │   └── matchRoutes.js        # Match & messaging endpoints (/matches, /messages)
 ├── sockets/
 │   └── socketHandler.js      # Socket.IO matchmaking queue & WebRTC signaling
 ├── utils/
 │   ├── geo.js                # Haversine distance formula algorithm
 │   └── helpers.js            # User object sanitizer
+├── .env.example              # Environment variable template
 ├── package.json
-├── server.js                 # Application entry point
-└── vercel.json               # Deployment configuration
+├── render.yaml               # Render deployment blueprint
+└── server.js                 # Application entry point
 ```
 
 ---
 
 ## 12. Roadmap
 
-- [ ] **STUN/TURN Relay Server Integration**: Add custom TURN configuration (e.g. Coturn / Twilio Network) for restricted NAT environments.
+- [x] **STUN/TURN Relay Server Integration**: TURN relay via Cloudflare Realtime or static credentials for restricted NAT environments.
 - [ ] **End-to-End Encryption**: Encrypt persistent chat text messages and voice notes prior to database storage.
 - [ ] **Notification Badges**: Push notifications for incoming direct call invitations when the app is minimized.
 - [ ] **Group Video Rooms**: Interest-based multi-user video calling rooms.

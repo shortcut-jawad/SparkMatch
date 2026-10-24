@@ -2,7 +2,7 @@
 import { socket }   from '../socket.js';
 import { state }    from '../state.js';
 import { initials, compressPic } from '../utils.js';
-import { apiPostChatImage } from '../api.js';
+import { apiPostChatImage, apiGetIceConfig } from '../api.js';
 import { populateVideoChatSidebar } from '../app.js';
 
 let pendingVideoImageFile = null;
@@ -14,11 +14,6 @@ function clearVideoImagePreview() {
   if (bar) bar.style.display = 'none';
   if (img) img.src = '';
 }
-
-const ICE = { iceServers: [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-] };
 
 let _toast     = null;
 let _callTimer = null;
@@ -302,7 +297,7 @@ async function _startPeerConnection(isInitiator) {
     return;
   }
 
-  state.chatCallPc = new RTCPeerConnection(ICE);
+  state.chatCallPc = new RTCPeerConnection(await apiGetIceConfig());
   state.chatCallStream.getTracks().forEach(t => state.chatCallPc.addTrack(t, state.chatCallStream));
 
   state.chatCallPc.ontrack = e => {

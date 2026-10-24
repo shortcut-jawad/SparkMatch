@@ -99,3 +99,19 @@ export async function apiPostChatImage(token, matchId, blob) {
   if (!res.ok) throw new Error(data.error || 'Upload failed');
   return data;
 }
+
+// STUN-only fallback so calls still work (on open networks) if the server can't supply TURN
+const FALLBACK_ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+let _iceConfig = null;
+
+export async function apiGetIceConfig() {
+  if (_iceConfig) return _iceConfig;
+  try {
+    const res = await fetch('/api/ice-servers', { headers: { Authorization: 'Bearer ' + getToken() } });
+    if (!res.ok) throw new Error('ICE config unavailable');
+    _iceConfig = await res.json();
+    return _iceConfig;
+  } catch {
+    return FALLBACK_ICE;
+  }
+}

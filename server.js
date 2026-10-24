@@ -6,6 +6,7 @@ const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const createMatchRouter = require('./routes/matchRoutes');
+const iceRoutes = require('./routes/iceRoutes');
 const initSockets = require('./sockets/socketHandler');
 
 const app = express();
@@ -25,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 app.use('/api', authRoutes);
 app.use('/api/matches', createMatchRouter(io));
+app.use('/api/ice-servers', iceRoutes);
 
 // ── Socket / Matchmaking ──
 initSockets(io);

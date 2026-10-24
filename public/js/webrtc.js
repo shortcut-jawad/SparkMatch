@@ -2,8 +2,7 @@
 import { socket } from './socket.js';
 import { state }  from './state.js';
 import { initials } from './utils.js';
-
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+import { apiGetIceConfig } from './api.js';
 
 export function initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg }) {
 
@@ -43,7 +42,7 @@ export function initWebRTC({ showScreen, toast, doJoinWaiting, appendMsg }) {
       toast('Camera/mic access denied');
     }
 
-    state.pc = new RTCPeerConnection(ICE);
+    state.pc = new RTCPeerConnection(await apiGetIceConfig());
     if (state.localStream) state.localStream.getTracks().forEach(t => state.pc.addTrack(t, state.localStream));
 
     state.pc.ontrack = e => { document.getElementById('remote-video').srcObject = e.streams[0]; };

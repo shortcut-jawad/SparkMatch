@@ -1,0 +1,28 @@
+# Render Blueprint: deploys SparkMatch as a single free web service.
+# Socket.IO matchmaking keeps state in memory, so this must stay one long-running instance.
+services:
+  - type: web
+    name: sparkmatch
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # TURN relay: set the Cloudflare pair, or the static TURN_* trio (e.g. Metered Open Relay)
+      - key: CF_TURN_KEY_ID
+        sync: false
+      - key: CF_TURN_API_TOKEN
+        sync: false
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
