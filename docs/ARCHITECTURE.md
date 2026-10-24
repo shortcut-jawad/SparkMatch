@@ -140,7 +140,7 @@ Overview of HTTP REST routes provided by Express.js.
 ### Endpoint Summary:
 | Method | Path | Auth Required | Description |
 |--------|------|---------------|-------------|
-| `GET` | `/api/health` | No | Server status check |
+| `GET` | `/api/health` | No | Server and MongoDB status check (`503` if the database is unreachable) |
 | `POST` | `/api/register` | No | Register new account with optional picture upload |
 | `POST` | `/api/login` | No | Authenticate user and return JWT token |
 | `GET` | `/api/profile` | Yes | Get authenticated user profile |

@@ -139,7 +139,7 @@ The app runs as a single Render web service from `render.yaml`. It must stay one
 1. In Render, choose **New → Blueprint** and select this repository.
 2. Fill in `MONGODB_URI` and one set of TURN variables when prompted. `JWT_SECRET` is generated automatically.
 3. In MongoDB Atlas **Network Access**, allow connections from Render (or `0.0.0.0/0`).
-4. Free instances sleep after ~15 minutes without traffic. To avoid the cold-start delay, ping `https://<your-app>.onrender.com/api/health` every 10 minutes with a free monitor such as cron-job.org or UptimeRobot.
+4. Free instances sleep after ~15 minutes without traffic, and free Atlas clusters pause after prolonged inactivity. Ping `https://<your-app>.onrender.com/api/health` every 5–10 minutes with a free monitor such as UptimeRobot: the health check also pings MongoDB, so one monitor keeps both awake and alerts you if either goes down.
 
 ---
 
@@ -151,12 +151,15 @@ You can test the server health and database connectivity by querying the health 
 curl http://localhost:3000/api/health
 ```
 
-**Expected Response:**
+**Expected Response** (`200 OK`):
 ```json
 {
-  "ok": true
+  "ok": true,
+  "db": "up"
 }
 ```
+
+If MongoDB is unreachable, the endpoint returns `503` with `{ "ok": false, "db": "down" }`.
 
 ---
 
